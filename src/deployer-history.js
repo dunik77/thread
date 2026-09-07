@@ -15,20 +15,27 @@ const { checkKnownInfra } = require("./known-infra.js");
  *   { status: "resolved", input, deployer, viaToken, infra, launches, hitLimit }
  *   { status: "inconclusive", input, reason }
  * `infra` is the known-infra record (see known-infra.js) or null.
+ *
+ * `limit` defaults to 30, not the ceiling of 50 the query itself allows.
+ * Found in practice (2026-09-07): Bitquery's realtime tier gets noticeably
+ * more likely to time out on a heavy deployer as the requested count grows,
+ * and this is read interactively (a person watching a page), where a
+ * smaller, faster, slightly-more-likely-to-succeed answer beats a bigger
+ * one that might not arrive. `scripts/deployer-history.js` and callers that
+ * want the ceiling can still pass `{ limit: 50 }` explicitly.
  */
-async function lookupDeployerHistory(input, apiKey) {
+async function lookupDeployerHistory(input, apiKey, { limit = 30 } = {}) {
   if (!isAddress(input)) {
     throw new Error(`not a valid address: ${input}`);
   }
 
-  // See the long comment in scripts/deployer-history.js's git history (and
-  // README "Try it"): Bitquery's realtime tier was observed timing out on a
-  // genuine zero-match Arguments filter rather than returning `[]` quickly,
-  // so "try deployer, fall back to token" is run as a race, not a sequence,
-  // and a double failure is reported as inconclusive rather than a
-  // confirmed negative it can't actually back up.
+  // See README "Try it": Bitquery's realtime tier was observed timing out on
+  // a genuine zero-match Arguments filter rather than returning `[]`
+  // quickly, so "try deployer, fall back to token" is run as a race, not a
+  // sequence, and a double failure is reported as inconclusive rather than
+  // a confirmed negative it can't actually back up.
   const deployerAttempt = (async () => {
-    const { query } = buildLaunchQuery("deployer", input, { limit: 50 });
+    const { query } = buildLaunchQuery("deployer", input, { limit });
     return runQuery(query, apiKey);
   })();
 
@@ -55,13 +62,13 @@ async function lookupDeployerHistory(input, apiKey) {
         block: launches[i].Block,
         txHash: launches[i].Transaction.Hash,
       })),
-      hitLimit: launches.length === 50,
+      hitLimit: launches.length === limit,
     };
   }
 
   if (tokenResult.status === "fulfilled" && tokenResult.value) {
     const deployer = tokenResult.value;
-    const { query } = buildLaunchQuery("deployer", deployer, { limit: 50 });
+    const { query } = buildLaunchQuery("deployer", deployer, { limit });
     const launches = await runQuery(query, apiKey);
     return {
       status: "resolved",
@@ -76,7 +83,7 @@ async function lookupDeployerHistory(input, apiKey) {
         block: launches[i].Block,
         txHash: launches[i].Transaction.Hash,
       })),
-      hitLimit: launches.length === 50,
+      hitLimit: launches.length === limit,
     };
   }
 

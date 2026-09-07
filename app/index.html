@@ -199,9 +199,26 @@ async function fetchContractCard(addr){
   return { kind: 'contract', proxyTarget, values };
 }
 
-async function fetchDeployerHistory(addr){
-  const res = await fetch(`/api/deployer-history?address=${addr}`);
-  return res.json();
+/**
+ * Bitquery's realtime tier gets less reliable as a deployer's launch count
+ * grows -- observed timing out and needing more than one try, with no other
+ * change, against real addresses in this app's own quick-fill list. Rather
+ * than hide that behind one long, silent server-side retry, this retries
+ * client-side (up to 3 tries) and calls `onAttempt` before each one so the
+ * status line can show real progress instead of looking frozen. Only an
+ * "inconclusive" result is retried -- a resolved answer or a hard error
+ * returns immediately.
+ */
+async function fetchDeployerHistory(addr, onAttempt){
+  const maxAttempts = 3;
+  let last = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++){
+    if (onAttempt) onAttempt(attempt, maxAttempts);
+    const res = await fetch(`/api/deployer-history?address=${addr}`);
+    last = await res.json();
+    if (last.status !== 'inconclusive') return last;
+  }
+  return last;
 }
 
 async function run(){
@@ -212,13 +229,19 @@ async function run(){
     return;
   }
   statusLine.className = 'status-line';
-  statusLine.textContent = 'reading chain and querying deployer history…';
+  statusLine.textContent = 'reading chain…';
   goBtn.disabled = true;
+
+  const onAttempt = (attempt, max) => {
+    statusLine.textContent = attempt === 1
+      ? 'reading chain and querying deployer history…'
+      : `deployer history is slow to answer (Bitquery's free tier) — retrying, attempt ${attempt} of ${max}…`;
+  };
 
   try{
     const [contractCard, history] = await Promise.all([
       fetchContractCard(addr).catch(e => ({ kind: 'error', message: e.message })),
-      fetchDeployerHistory(addr).catch(e => ({ status: 'error', reason: e.message })),
+      fetchDeployerHistory(addr, onAttempt).catch(e => ({ status: 'error', reason: e.message })),
     ]);
     render(addr, contractCard, history);
     statusLine.textContent = 'done';

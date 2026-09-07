@@ -74,16 +74,14 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     try {
-      // Bitquery's realtime tier was observed timing out intermittently on
-      // heavier queries (a deployer with 50+ launches, in testing) and
-      // succeeding on an immediate retry with no other change. One retry
-      // only -- this masks transient load, not genuine zero-match cases,
-      // which lookupDeployerHistory already treats as "inconclusive" rather
-      // than erroring, so a real absence still won't loop pointlessly.
-      let result = await lookupDeployerHistory(address, API_KEY);
-      if (result.status === "inconclusive") {
-        result = await lookupDeployerHistory(address, API_KEY);
-      }
+      // One attempt per request, on purpose. Bitquery's realtime tier was
+      // observed timing out intermittently on heavier queries and sometimes
+      // needing more than one retry to come back -- retrying silently
+      // server-side just turns that into a longer silent wait instead of a
+      // shorter one. app/index.html retries this endpoint itself, with a
+      // status line that updates between attempts, so a slow deployer looks
+      // like progress instead of a frozen button.
+      const result = await lookupDeployerHistory(address, API_KEY);
       sendJson(res, 200, result);
     } catch (err) {
       sendJson(res, 502, { error: err.message });

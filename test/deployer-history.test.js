@@ -125,10 +125,10 @@ test("lookupDeployerHistory rejects a malformed address before any network call"
   await assert.rejects(() => lookupDeployerHistory("not-an-address", "fake-key"), /not a valid address/);
 });
 
-test("lookupDeployerHistory reports hitLimit when a deployer query returns exactly 50", async () => {
+test("lookupDeployerHistory reports hitLimit when a deployer query returns exactly the requested limit", async () => {
   const restore = stubFetch((query) => {
     if (query.includes('Name: {is: "deployer"}')) {
-      const events = Array.from({ length: 50 }, (_, i) =>
+      const events = Array.from({ length: 5 }, (_, i) =>
         launchedEvent(`0xtoken${i}`, REAL_DEPLOYER, `0xtx${i}`, "2026-09-05T00:00:00Z")
       );
       return { data: { EVM: { Events: events } } };
@@ -136,9 +136,27 @@ test("lookupDeployerHistory reports hitLimit when a deployer query returns exact
     return { data: { EVM: { Events: [] } } };
   });
   try {
-    const result = await lookupDeployerHistory(REAL_DEPLOYER, "fake-key");
-    assert.equal(result.launches.length, 50);
+    const result = await lookupDeployerHistory(REAL_DEPLOYER, "fake-key", { limit: 5 });
+    assert.equal(result.launches.length, 5);
     assert.equal(result.hitLimit, true);
+  } finally {
+    restore();
+  }
+});
+
+test("lookupDeployerHistory defaults to a limit of 30, lower than the query's own ceiling of 50", async () => {
+  // both the deployer-argument and token-argument attempts fire in parallel;
+  // capture every query issued and check the deployer one specifically.
+  const capturedQueries = [];
+  const restore = stubFetch((query) => {
+    capturedQueries.push(query);
+    return { data: { EVM: { Events: [] } } };
+  });
+  try {
+    await lookupDeployerHistory(REAL_DEPLOYER, "fake-key");
+    const deployerQuery = capturedQueries.find((q) => q.includes('Name: {is: "deployer"}'));
+    assert.ok(deployerQuery, "expected a deployer-argument query to have been issued");
+    assert.ok(deployerQuery.includes("limit: {count: 30}"));
   } finally {
     restore();
   }
