@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <img alt="tests" src="https://img.shields.io/badge/tests-44%20passing-B7FF00?style=flat-square&labelColor=1a1613">
+  <img alt="tests" src="https://img.shields.io/badge/tests-49%20passing-B7FF00?style=flat-square&labelColor=1a1613">
   <img alt="runtime deps" src="https://img.shields.io/badge/runtime%20deps-0-B7FF00?style=flat-square&labelColor=1a1613">
   <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A518-c99a44?style=flat-square&labelColor=1a1613">
   <img alt="deployer history" src="https://img.shields.io/badge/deployer%20history-live-B7FF00?style=flat-square&labelColor=1a1613">
@@ -108,12 +108,19 @@ or a token address — a token resolves to its deployer first.
 When Bitquery can't resolve an address, that alone doesn't mean the address isn't a Pons v2 launch —
 Bitquery's realtime tier was observed timing out on a genuine zero-match filter, and separately on some
 heavy queries under load. So before giving up, [src/factory-logs.js](src/factory-logs.js) asks the public
-RPC directly, in both the token and deployer argument positions. Only if that direct check also succeeds
-*and* comes back empty both ways does the answer become a confident **"not a Pons v2 launch"** — a real
-example that surfaced this exact gap (a genuine token that Bitquery kept timing out on) is in the FAQ below.
-If the direct check fails too, the honest answer stays "inconclusive" — never upgraded to a negative on
-partial information. `app/index.html` retries an inconclusive result client-side, up to 3 times, with the
+RPC directly, in both the token and deployer argument positions, constrained to the real `TokenLaunched`
+signature hash so the match is safe to read positionally. If that direct check comes back empty both ways,
+the answer becomes a confident **"not a Pons v2 launch."** If it comes back with real matches instead, those
+matches — not just a yes/no — become the answer: a `"resolved"` result marked `viaDirectRpc: true`, built
+from the chain directly rather than from Bitquery. Only if the direct check *also* fails does the honest
+answer stay "inconclusive" — never upgraded to a negative, or assembled from a partial success, when it
+can't be backed up. `app/index.html` retries an inconclusive result client-side, up to 3 times, with the
 status line updated before each attempt so a slow answer looks like progress instead of a dead page.
+
+Both data sources can still fail at once, including from this project's own testing — the public RPC is
+also free and rate-limited, and a same-session attempt to bisect for the factory's exact deployment block
+(to narrow future scans away from genesis) tripped that limit and got abandoned rather than shipped on the
+corrupted result it produced. See STATUS.md's "known limitation" entry.
 
 ## Why fee-recipient clusters aren't there yet
 
@@ -175,7 +182,7 @@ Known Pons v2 contracts this spec and reader are written against (Robinhood Chai
 
 ```sh
 git clone https://github.com/<you>/thread && cd thread
-npm test                                  # 44 checks, 0 dependencies, no network
+npm test                                  # 49 checks, 0 dependencies, no network
 echo "BITQUERY_API_TOKEN=..." > .env      # free token: https://account.bitquery.io/user/api_v2/access_tokens
 npm run serve                             # the real service at http://localhost:4663
 ```
@@ -190,7 +197,7 @@ needs nothing but a browser and stays that way.
 npm test
 ```
 
-Forty-four checks, all offline, none touching a network. They cover the ERC-20/proxy decoder in
+Forty-nine checks, all offline, none touching a network. They cover the ERC-20/proxy decoder in
 [src/chain-read.js](src/chain-read.js) against **frozen, real** `eth_getCode`/`eth_call` responses from
 2026-09-07; the `.env` parser in [src/env.js](src/env.js); the Bitquery query builder in
 [src/bitquery.js](src/bitquery.js), checked against the real shape of a live response; the known-infra
@@ -239,11 +246,18 @@ shrug. If you still see "inconclusive" today, it means *both* data sources faile
 genuinely rare, and worth just clicking Look up again.
 
 **I looked up a real token and got a raw "context deadline exceeded" error — is that a bug?** Also fixed,
-same day. A real, graduated launch ("Pushin'", `0xE1E5f00A9B0255ca4dF85B3130eE0F77d15acC2D`) resolved its
-deployer correctly, then the separate follow-up query for that deployer's *other* launches timed out — and
-an unwrapped `await` turned that into a crash instead of a partial answer. It now returns the confirmed
-deployer address with a clear note that the rest of the history couldn't be fetched this time, instead of
-throwing away a fact it already had. See STATUS.md M1.7.
+same day, twice over. A real, graduated launch ("Pushin'", `0xE1E5f00A9B0255ca4dF85B3130eE0F77d15acC2D`)
+resolved its deployer correctly, then the separate follow-up query for that deployer's *other* launches
+timed out — an unwrapped `await` first turned that into a crash (fixed in M1.7), and the fix after that
+initially just reported the confirmed deployer with an empty launch list, which was honest but not useful.
+It now falls back to reading the deployer's launches directly off the chain instead, the same real data
+`src/factory-logs.js` already fetches to answer "does this exist" — see STATUS.md M1.8.
+
+**I clicked the deployer and got "unclear -- try again" with no tokens shown — same bug?** Related, and
+mostly the same fix (M1.8): that fallback used to only answer yes/no, discarding the actual matching launches
+its own `eth_getLogs` call already had in hand. If you still see this, both Bitquery and the direct chain
+check failed at the same time — genuinely rare, but not impossible, especially if a lot of lookups have run
+back to back recently (both data sources are free-tier and rate-limited). Wait a few seconds and retry.
 
 **Where do I find every token launched on Pons v2, not just one I already have an address for?**
 Not here — thread answers questions about a specific address you already have, and deliberately doesn't
