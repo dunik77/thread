@@ -28,7 +28,7 @@ const path = require("path");
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PORT = 9222;
 const SERVICE = process.env.THREAD_URL || "http://localhost:4663";
-const TERMINAL = process.env.THREAD_VIEW === "terminal";
+const TERMINAL = false; // Standalone terminal capture lives in thread-terminal.
 // a real token whose deployer has a long, named launch history -- shows the
 // whole product in one frame: contract card, resolved deployer, the list
 const ADDRESS = process.argv[2] || "0xa146cc739a09d0543e7e5b525f8eca26bb518032";

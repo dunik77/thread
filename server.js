@@ -55,21 +55,6 @@ function sendJson(res, status, body) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
-  const assets = {
-    "/app.js": ["app/app.js", "text/javascript"],
-    "/terminal": ["app/terminal.html", "text/html"],
-    "/terminal.css": ["app/terminal.css", "text/css"],
-    "/terminal.js": ["app/terminal.js", "text/javascript"],
-  };
-  if (req.method === "GET" && assets[url.pathname]) {
-    const [file, type] = assets[url.pathname];
-    fs.readFile(path.join(__dirname, file), (err, data) => {
-      res.writeHead(err ? 404 : 200, { "Content-Type": `${type}; charset=utf-8` });
-      res.end(err ? "not found" : data);
-    });
-    return;
-  }
-
   if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
     fs.readFile(APP_HTML_PATH, (err, data) => {
       if (err) {

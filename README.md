@@ -122,15 +122,14 @@ That last row is the one the rest of the project is built around.
 ## What a lookup gives you
 
 <p align="center">
-  <img src="./assets/terminal.png" alt="thread terminal view: 31 real launches traced back to one deployer" width="100%">
+  <img src="./assets/terminal.png" alt="thread trace: one token address in, 31 launches by the same recorded deployer out" width="100%">
 </p>
 
 <p align="center">
-  <sub>A real trace, not a mock-up: one token address in, 31 launches by the same recorded deployer out,
-  every row with its block and transaction. Note what it says out loud — the query limit was reached, rows
-  were hidden to fit the capture, and fee-recipient history isn't implemented.</sub>
+  <sub>A real trace, not a mock-up. One token address in, 31 launches by the same recorded deployer out,
+  each row carrying its block and transaction. Note what it says out loud: the query limit was reached,
+  rows were hidden to fit the capture, and fee-recipient history is not implemented.</sub>
 </p>
-
 
 Paste a token or deployer address and three cards come back. **Contract**: name, symbol, supply, and whether
 it's a minimal-proxy clone, read client-side straight off the chain. **Deployer history**: who deployed it
