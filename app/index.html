@@ -87,6 +87,12 @@
   .copy-btn.copied{color:var(--good);border-color:var(--good);}
   .field .v .copy-btn{margin-left:8px;}
 
+  /* clicking an address looks up that address in thread itself, not a navigation away from it */
+  .addr-link{font-family:inherit;font-size:inherit;color:var(--accent);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;text-decoration-color:var(--accent-dim);text-underline-offset:3px;word-break:break-all;text-align:left;}
+  .addr-link:hover{color:#dcae57;}
+  .explorer-mini{font-family:var(--mono);font-size:11px;color:var(--text-faint);text-decoration:none;margin-left:8px;border:1px solid var(--line);border-radius:3px;padding:3px 7px;white-space:nowrap;}
+  .explorer-mini:hover{color:var(--text-dim);border-color:var(--accent-dim);}
+
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--paper-raised);border:1px solid var(--good);color:var(--text);font-family:var(--sans);font-size:12.5px;padding:9px 16px;border-radius:5px;opacity:0;pointer-events:none;transition:opacity 0.18s ease, transform 0.18s ease;z-index:10;}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   @media (prefers-reduced-motion: reduce){.toast{transition:none;}}
@@ -193,6 +199,26 @@ function copyBtnHtml(addr){
   return `<button class="copy-btn" onclick="copyAddr('${addr}', this)" title="Copy full address">copy</button>`;
 }
 function explorerTx(h){ return `${EXPLORER}/tx/${h}`; }
+
+/**
+ * The primary way to follow an address inside thread: replaces the input
+ * and runs a fresh lookup, the same as clicking one of the quick-fill
+ * chips. Used for the deployer address specifically -- clicking it treats
+ * it as "look this account up here," not "leave and go read a raw
+ * explorer page," which is the whole point of building this as a service
+ * rather than pointing everything at Blockscout.
+ */
+function lookupInApp(address){
+  addrInput.value = address;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  run();
+}
+
+/** An address rendered as an in-app lookup link, with a small separate icon out to the explorer for anyone who still wants the raw page. */
+function addrLinkHtml(address){
+  return `<button class="addr-link" onclick="lookupInApp('${address}')" title="Look up ${address} in thread">${address}</button>` +
+    `<a class="explorer-mini" href="${explorerAddr(address)}" target="_blank" rel="noopener" title="Open on block explorer instead">explorer ↗</a>`;
+}
 
 async function rpc(method, params){
   const res = await fetch(RPC, {
@@ -374,7 +400,7 @@ function render(addr, card, history){
     : '';
   html += `<div class="card-head"><h3>Deployer history</h3>${historyPill}</div>`;
   if (history.status === 'resolved'){
-    html += `<div class="field"><div class="k">Deployer</div><div class="v"><a href="${explorerAddr(history.deployer)}" target="_blank" rel="noopener">${history.deployer}</a>${copyBtnHtml(history.deployer)}</div></div>`;
+    html += `<div class="field"><div class="k">Deployer</div><div class="v">${addrLinkHtml(history.deployer)}${copyBtnHtml(history.deployer)}</div></div>`;
     if (history.viaToken){
       html += `<p style="margin:8px 0 0;color:var(--text-faint);font-size:12px;">(resolved from the token address you entered)</p>`;
     }
