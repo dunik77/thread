@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>thread avatar — rain</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:512px;height:512px;overflow:hidden;}
+  body{background:#080b09;position:relative;}
+  canvas{position:absolute;inset:0;}
+</style>
+</head>
+<body>
+  <canvas id="rain" width="512" height="512"></canvas>
+<script>
+/*
+ * The banner's idea at avatar scale: a flood of hex, and one column that
+ * isn't noise -- a real address, lit, because it turned up before. Few
+ * columns and heavy weight so it still reads at 40px in a GitHub sidebar.
+ */
+const c = document.getElementById('rain');
+const x = c.getContext('2d');
+const W = 512, H = 512;
+const COL = 34, ROW = 38;
+const COLS = Math.ceil(W / COL);
+const ROWS = Math.ceil(H / ROW);
+
+let seed = 4663;
+const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+const HEX = '0123456789abcdef';
+const pick = () => HEX[Math.floor(rnd() * 16)];
+
+const REPEAT = 'df2237114d595e0bf4d35cbcdebcdf43c55c4669';
+const HOT = 7;          // the column that matters
+const HOT_HEAD = 6;     // where the eye should land
+
+x.fillStyle = '#080b09';
+x.fillRect(0, 0, W, H);
+x.font = '600 30px "IBM Plex Mono", ui-monospace, monospace';
+x.textBaseline = 'top';
+
+for (let col = 0; col < COLS; col++) {
+  const px = col * COL + 5;
+
+  if (col === HOT) {
+    for (let row = 0; row <= ROWS; row++) {
+      const ch = REPEAT[row % REPEAT.length];
+      const d = Math.abs(row - HOT_HEAD);
+      const a = Math.max(0.3, 1 - d / 7);
+      x.fillStyle = row === HOT_HEAD ? '#fff6e0' : `rgba(240,193,99,${a.toFixed(3)})`;
+      x.fillText(ch, px, row * ROW + 3);
+    }
+    continue;
+  }
+
+  const head = Math.floor(rnd() * (ROWS + 6)) - 3;
+  const tail = 3 + Math.floor(rnd() * 7);
+  // dimmer than the banner's rain: at 40px the lit column has to win
+  const dim = 0.25 + rnd() * 0.4;
+  for (let t = 0; t < tail; t++) {
+    const row = head - t;
+    if (row < 0 || row > ROWS) continue;
+    const fade = 1 - t / tail;
+    x.fillStyle = t === 0
+      ? `rgba(226,255,235,${(0.55 * dim + 0.15).toFixed(3)})`
+      : `rgba(53,217,106,${(Math.pow(fade, 1.4) * dim * 0.75).toFixed(3)})`;
+    x.fillText(pick(), px, row * ROW + 3);
+  }
+}
+
+// the marker on the lit character, and the thread that leaves it, loops
+// through the flood, and closes back on the same character -- the banner's
+// glyph, compressed until it survives a 40px avatar
+const mx = HOT * COL + 1, my = HOT_HEAD * ROW;
+const cxr = mx + COL + 4, cyr = my + ROW / 2;
+
+x.beginPath();
+x.moveTo(cxr, cyr);
+x.bezierCurveTo(cxr + 190, cyr + 60, cxr + 150, cyr + 300, mx + 20, cyr + 268);
+x.bezierCurveTo(mx - 130, cyr + 240, mx - 96, cyr + 30, mx - 3, cyr);
+x.lineWidth = 9;
+x.lineCap = 'round';
+x.strokeStyle = 'rgba(240,193,99,0.9)';
+x.stroke();
+
+x.lineWidth = 4;
+x.strokeStyle = '#f0c163';
+x.strokeRect(mx, my, COL + 4, ROW + 2);
+
+// vignette so the edges fall away and the lit column carries the icon
+const g = x.createRadialGradient(W / 2, H / 2, 90, W / 2, H / 2, 330);
+g.addColorStop(0, 'rgba(8,11,9,0)');
+g.addColorStop(1, 'rgba(8,11,9,0.82)');
+x.fillStyle = g;
+x.fillRect(0, 0, W, H);
+</script>
+</body>
+</html>

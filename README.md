@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./assets/avatar.png" alt="thread" width="128">
+  <img src="./assets/avatar-matrix.png" alt="thread" width="128">
 </p>
 <p align="center">
-  <img src="./assets/banner.png" alt="thread — new wallets, familiar connections" width="100%">
+  <img src="./assets/banner-matrix.png" alt="thread — new wallets, familiar connections" width="100%">
 </p>
 
 <p align="center">

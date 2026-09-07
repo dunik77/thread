@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>thread banner — rain</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1280px;height:420px;overflow:hidden;}
+  body{background:#080b09;position:relative;font-family:'IBM Plex Mono',ui-monospace,monospace;}
+  canvas{position:absolute;inset:0;}
+
+  /* darkening pool so the wordmark stays legible through the rain */
+  .vignette{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:1000px; height:300px;
+    background:radial-gradient(ellipse at center, rgba(8,11,9,0.95) 0%, rgba(8,11,9,0.85) 45%, rgba(8,11,9,0) 72%);
+  }
+  .edges{
+    position:absolute; inset:0;
+    background:linear-gradient(to bottom, rgba(8,11,9,0.9) 0%, transparent 18%, transparent 82%, rgba(8,11,9,0.95) 100%);
+  }
+
+  h1{
+    position:absolute; left:0; right:0; top:118px; text-align:center;
+    font-family:'IBM Plex Serif',Georgia,serif; font-weight:700;
+    font-size:132px; letter-spacing:0.05em; line-height:1;
+    color:#eafff0;
+    text-shadow:0 0 40px rgba(53,217,106,0.35), 0 0 90px rgba(53,217,106,0.18), 0 3px 30px rgba(0,0,0,0.9);
+  }
+  .tagline{
+    position:absolute; left:0; right:0; top:276px; text-align:center;
+    font-size:20px; color:#7fbf95; letter-spacing:0.02em;
+    text-shadow:0 0 14px #080b09, 0 0 26px #080b09;
+  }
+  .tagline b{color:#eafff0; font-weight:500;}
+
+  .footer{
+    position:absolute; left:36px; right:36px; bottom:24px;
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:11.5px; letter-spacing:0.09em; color:#4f7a60;
+    text-shadow:0 0 12px #080b09, 0 0 22px #080b09;
+  }
+  .footer .hit{color:#f0c163;}
+  .footer .on{color:#35d96a;}
+  .sw{width:9px;height:9px;background:#f0c163;display:inline-block;vertical-align:-1px;margin-right:7px;}
+</style>
+</head>
+<body>
+  <canvas id="rain" width="1280" height="420"></canvas>
+  <div class="edges"></div>
+  <div class="vignette"></div>
+
+  <h1>thread</h1>
+  <div class="tagline">new wallets. <b>familiar connections.</b></div>
+
+  <div class="footer">
+    <span><span class="sw"></span>the same address, twice in the same flood</span>
+    <span>pons v2 &middot; <span class="on">robinhood chain 4663</span> &middot; evidence only, nothing scored</span>
+  </div>
+
+<script>
+/*
+ * Not katakana: every character in this rain is hex, and two columns carry
+ * one real address that turned up twice in the field data -- highlighted,
+ * because noticing exactly that is what the tool does.
+ */
+const c = document.getElementById('rain');
+const x = c.getContext('2d');
+
+const W = 1280, H = 420;
+const COL = 15;          // column pitch
+const ROW = 17;          // line height
+const COLS = Math.ceil(W / COL);
+const ROWS = Math.ceil(H / ROW);
+
+// deterministic RNG so the image is reproducible from this file
+let seed = 20260907;
+const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+
+const HEX = '0123456789abcdef';
+const pick = () => HEX[Math.floor(rnd() * 16)];
+
+// a real repeat deployer from the field data, dropped into two columns
+const REPEAT = 'df2237114d595e0bf4d35cbcdebcdf43c55c4669';
+const repeatCols = [17, 63];      // far apart, so the eye has to travel
+const repeatHeads = [16, 9];      // different depths: seen at different times
+
+x.fillStyle = '#080b09';
+x.fillRect(0, 0, W, H);
+x.font = '600 14px "IBM Plex Mono", ui-monospace, monospace';
+x.textBaseline = 'top';
+
+for (let col = 0; col < COLS; col++) {
+  const isRepeat = repeatCols.includes(col);
+  const px = col * COL + 3;
+
+  if (isRepeat) {
+    // the whole column is one real address, running top to bottom, at its
+    // brightest where the eye is meant to land
+    const head = repeatHeads[repeatCols.indexOf(col)];
+    for (let row = 0; row <= ROWS; row++) {
+      const ch = REPEAT[row % REPEAT.length];
+      const d = Math.abs(row - head);
+      const a = Math.max(0.22, 1 - d / 13);
+      x.fillStyle = row === head ? '#fff6e0' : `rgba(240,193,99,${a.toFixed(3)})`;
+      x.fillText(ch, px, row * ROW + 2);
+    }
+    continue;
+  }
+
+  const head = Math.floor(rnd() * (ROWS + 14)) - 6;
+  const tail = 6 + Math.floor(rnd() * 16);
+  const dim = 0.35 + rnd() * 0.65;    // per-column brightness, so it has depth
+
+  for (let t = 0; t < tail; t++) {
+    const row = head - t;
+    if (row < 0 || row > ROWS) continue;
+    const fade = 1 - t / tail;
+    const ch = pick();
+    if (t === 0) {
+      x.fillStyle = `rgba(226,255,235,${(0.85 * dim + 0.15).toFixed(3)})`;
+    } else {
+      const a = Math.pow(fade, 1.5) * dim;
+      x.fillStyle = `rgba(53,217,106,${(a * 0.85).toFixed(3)})`;
+    }
+    x.fillText(ch, px, row * ROW + 2);
+  }
+}
+
+// mark the two repeat columns: a box around the head character of each
+x.lineWidth = 1.5;
+x.strokeStyle = 'rgba(240,193,99,0.75)';
+for (let i = 0; i < repeatCols.length; i++) {
+  const px = repeatCols[i] * COL;
+  const py = repeatHeads[i] * ROW;
+  x.strokeRect(px - 1, py - 1, COL + 3, ROW + 2);
+}
+
+// and thread them together: the connection, arcing below the tagline and
+// staying clear of both the footer strip and the frame edge
+const [c1, c2] = repeatCols, [h1, h2] = repeatHeads;
+const x1 = c1 * COL + COL / 2, y1 = h1 * ROW + ROW + 6;
+const x2 = c2 * COL + COL / 2, y2 = h2 * ROW + ROW + 6;
+x.beginPath();
+x.moveTo(x1, y1);
+x.bezierCurveTo(x1 + 118, 400, x2 - 132, 395, x2, y2);
+x.strokeStyle = 'rgba(240,193,99,0.7)';
+x.lineWidth = 2;
+x.stroke();
+</script>
+</body>
+</html>
