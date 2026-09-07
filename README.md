@@ -15,16 +15,16 @@
 ```
 
 <p align="center">
-  <b>Both rows above are <code>node scripts/deployer-history.js &lt;address&gt;</code>, live</b> — the second
-  one is thread catching its own false positive before it shipped one. Full story below.
+  <b>Both rows above are real, live, and clickable</b> — the second one is thread catching its own false
+  positive before it shipped one. Full story below.
 </p>
 
 <p align="center">
-  <code>npm test && node scripts/deployer-history.js 0xca11bde05977b3631167028862be2a173976ca11</code>
+  <code>npm run serve</code> → <code>http://localhost:4663</code>, or <code>node scripts/deployer-history.js 0xca11bde05977b3631167028862be2a173976ca11</code>
 </p>
 
 <p align="center">
-  <img alt="tests" src="https://img.shields.io/badge/tests-27%20passing-B7FF00?style=flat-square&labelColor=1a1613">
+  <img alt="tests" src="https://img.shields.io/badge/tests-33%20passing-B7FF00?style=flat-square&labelColor=1a1613">
   <img alt="runtime deps" src="https://img.shields.io/badge/runtime%20deps-0-B7FF00?style=flat-square&labelColor=1a1613">
   <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A518-c99a44?style=flat-square&labelColor=1a1613">
   <img alt="deployer history" src="https://img.shields.io/badge/deployer%20history-live-B7FF00?style=flat-square&labelColor=1a1613">
@@ -87,18 +87,26 @@ repeat behavior, kept as-is. Full writeup in [SPEC.md](SPEC.md) "Open questions.
 ## Try it
 
 ```sh
-open lookup/index.html                                    # ERC-20 metadata, no key needed
-node scripts/deployer-history.js <address>                # deployer history, needs a Bitquery key — see Install
+npm run serve                                              # the real service, clickable — needs a Bitquery key
+open lookup/index.html                                     # ERC-20 metadata only, no key needed
+node scripts/deployer-history.js <address>                 # same as the service, from a terminal
 ```
 
-`lookup/index.html` calls `eth_getCode`/`eth_call` straight from your browser against the public Robinhood
-Chain RPC — no install, no key. `deployer-history.js` needs a real Bitquery token because the data it reads
-(the full `TokenLaunched` log) isn't reachable from a keyless public endpoint at Pons v2's launch volume —
-see "Why fee-recipient clusters aren't there yet" below for the two dead ends that came before Bitquery.
-Both scripts accept either a deployer address or a token address; a token gets resolved to its deployer
-first, and both report an honest "inconclusive" rather than a false "not on Pons v2" when a lookup can't
-be resolved either way — Bitquery's realtime tier was observed timing out on a genuine zero-match filter
-rather than returning an empty list quickly, so a timeout here is never read as a confirmed negative.
+`npm run serve` starts a local server at `http://localhost:4663` and opens onto `app/index.html`: paste a
+token or deployer address, click Look up, and get two real cards back side by side — ERC-20 metadata (read
+client-side, same as `lookup/index.html`) and deployer history (read server-side from Bitquery, with working
+links to `robinhoodchain.blockscout.com` on every launch and every implementation address) — plus a third
+card that plainly says fee-recipient history isn't built, instead of leaving it out. Three examples are one
+click away: the real repeat deployer, the Multicall3 false positive, and a confirmed non-Pons address.
+
+The Bitquery key stays in `server.js`'s own process, loaded from `.env` — it never reaches the browser,
+which is exactly why this needs a running server and `lookup/index.html` (no key required) doesn't.
+`deployer-history.js` and the service's API both call the same tested function in
+[src/deployer-history.js](src/deployer-history.js), so they can't quietly disagree. Both accept a deployer
+or a token address — a token resolves to its deployer first — and both report an honest "inconclusive"
+rather than a false "not on Pons v2" when a lookup can't be resolved: Bitquery's realtime tier was observed
+timing out on a genuine zero-match filter, and separately on some heavy queries under load, so a timeout is
+never read as a confirmed negative (the service retries once automatically for the second case).
 
 ## Why fee-recipient clusters aren't there yet
 
@@ -160,10 +168,9 @@ Known Pons v2 contracts this spec and reader are written against (Robinhood Chai
 
 ```sh
 git clone https://github.com/<you>/thread && cd thread
-npm test                                  # 27 checks, 0 dependencies, no network
+npm test                                  # 33 checks, 0 dependencies, no network
 echo "BITQUERY_API_TOKEN=..." > .env      # free token: https://account.bitquery.io/user/api_v2/access_tokens
-node scripts/deployer-history.js 0xca11bde05977b3631167028862be2a173976ca11
-open lookup/index.html
+npm run serve                             # the real service at http://localhost:4663
 ```
 
 Node 18 or newer. `.env` is gitignored and read only by the Node scripts — the Bitquery token never reaches
@@ -176,13 +183,16 @@ needs nothing but a browser and stays that way.
 npm test
 ```
 
-Twenty-seven checks, all offline, none touching a network. They cover the ERC-20/proxy decoder in
+Thirty-three checks, all offline, none touching a network. They cover the ERC-20/proxy decoder in
 [src/chain-read.js](src/chain-read.js) against **frozen, real** `eth_getCode`/`eth_call` responses from
 2026-09-07; the `.env` parser in [src/env.js](src/env.js); the Bitquery query builder in
-[src/bitquery.js](src/bitquery.js), checked against the real shape of a live response; and the known-infra
+[src/bitquery.js](src/bitquery.js), checked against the real shape of a live response; the known-infra
 check in [src/known-infra.js](src/known-infra.js), including the actual Multicall3 address from the finding
-above. None of it depends on a network call succeeding, so `npm test` means the same thing whether or not
-Robinhood Chain or Bitquery are reachable when you run it. `lookup/index.html` embeds its own browser copy
+above; and the M1 resolution logic in [src/deployer-history.js](src/deployer-history.js) — the repeat-deployer,
+Multicall3, token-resolution, and inconclusive-timeout cases, each against a stubbed `fetch` shaped like a
+real captured response, not a live call. None of it depends on a network call succeeding, so `npm test`
+means the same thing whether or not Robinhood Chain or Bitquery are reachable when you run it.
+`lookup/index.html` and `app/index.html` each embed their own browser copy
 of `chain-read.js`'s functions rather than importing the module — a single static file with no build step
 can't cleanly pull in CommonJS — so the test file is the contract both copies are expected to satisfy.
 
@@ -192,6 +202,11 @@ can't cleanly pull in CommonJS — so the test file is the contract both copies 
 Fee-recipient history is not: `TokenLaunched` doesn't carry that data, and decoding it out of call input
 isn't built (SPEC.md M3). The full, assembled case file that joins both is `demo/index.html`'s job today,
 and it's still fixture data until M3 and M4 exist.
+
+**Is there a UI, or only a CLI?** Both. `npm run serve` runs the real service at `localhost:4663` —
+`app/index.html` is a page you click through, not just `deployer-history.js` printed to a terminal. It's a
+separate page from `lookup/index.html` on purpose: this one needs a server to keep the Bitquery key off the
+browser, so it can't be opened as a bare file the way the key-free lookup page can.
 
 **Are the three example tokens in the banner and mockup real Pons v2 launches?** No — checked directly
 against the factory, router, hook, and locker logs, and none of them appear. See `STATUS.md` M0.5. The
