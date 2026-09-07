@@ -199,6 +199,42 @@ async function fetchContractCard(addr){
   return { kind: 'contract', proxyTarget, values };
 }
 
+/** Same two read calls as fetchContractCard, but only the two needed to label a list row. */
+async function fetchNameSymbol(addr){
+  try{
+    const [nameRaw, symbolRaw] = await Promise.all([
+      rpc('eth_call', [{to:addr, data:'0x06fdde03'}, 'latest']),
+      rpc('eth_call', [{to:addr, data:'0x95d89b41'}, 'latest']),
+    ]);
+    return { name: decodeString(nameRaw), symbol: decodeString(symbolRaw) };
+  }catch(e){
+    return { name: null, symbol: null };
+  }
+}
+
+/**
+ * Bitquery's TokenLaunched event carries addresses only, no name or symbol
+ * -- so a deployer's other launches would otherwise render as a bare list
+ * of hex strings, telling you nothing about what any of them actually are.
+ * This fetches name/symbol for each one directly from the chain, same as
+ * the main Contract card above, capped at 8 concurrent requests so a
+ * deployer with 30 launches doesn't fire 60 simultaneous calls at a public,
+ * keyless RPC that's already shared with everyone else using it.
+ */
+async function enrichLaunches(launches){
+  const CONCURRENCY = 8;
+  const out = new Array(launches.length);
+  let next = 0;
+  async function worker(){
+    while (next < launches.length){
+      const i = next++;
+      out[i] = { ...launches[i], ...(await fetchNameSymbol(launches[i].token)) };
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, launches.length) }, worker));
+  return out;
+}
+
 /**
  * Bitquery's realtime tier gets less reliable as a deployer's launch count
  * grows -- observed timing out and needing more than one try, with no other
@@ -243,6 +279,10 @@ async function run(){
       fetchContractCard(addr).catch(e => ({ kind: 'error', message: e.message })),
       fetchDeployerHistory(addr, onAttempt).catch(e => ({ status: 'error', reason: e.message })),
     ]);
+    if (history.status === 'resolved' && history.launches.length > 0){
+      statusLine.textContent = `identifying ${history.launches.length} other launch(es)…`;
+      history.launches = await enrichLaunches(history.launches);
+    }
     render(addr, contractCard, history);
     statusLine.textContent = 'done';
   }catch(err){
@@ -281,17 +321,21 @@ function render(addr, card, history){
   html += '<div class="card">';
   html += `<div class="card-head"><h3>Deployer history</h3></div>`;
   if (history.status === 'resolved'){
+    html += `<div class="field"><div class="k">Deployer</div><div class="v"><a href="${explorerAddr(history.deployer)}" target="_blank" rel="noopener">${history.deployer}</a></div></div>`;
     if (history.viaToken){
-      html += `<p style="margin:0 0 12px;color:var(--text-dim);font-size:12.5px;">Launched by <a href="${explorerAddr(history.deployer)}" target="_blank" rel="noopener" style="color:var(--accent)">${short(history.deployer)}</a>${history.infra ? ' -- flagged below.' : '.'}</p>`;
+      html += `<p style="margin:8px 0 0;color:var(--text-faint);font-size:12px;">(resolved from the token address you entered)</p>`;
     }
     if (history.infra){
-      html += `<div class="infra-warning"><span class="mark">⚠</span><div><b>${history.infra.name}</b> -- not a person. ${history.infra.reason}</div></div>`;
+      html += `<div class="infra-warning" style="margin-top:12px;"><span class="mark">⚠</span><div><b>${history.infra.name}</b> -- not a person. ${history.infra.reason}</div></div>`;
     }
     html += `<div class="field"><div class="k">Launches found</div><div class="v">${history.launches.length}${history.hitLimit ? ' (hit query limit -- more may exist)' : ''}</div></div>`;
     if (history.launches.length > 0){
       html += '<div class="launch-list" style="margin-top:10px;">';
       for (const l of history.launches){
-        html += `<div class="row"><span class="t">${short(l.token)}</span><span class="time">${l.block.Time.slice(0,16).replace('T',' ')}</span><a class="explorer" href="${explorerTx(l.txHash)}" target="_blank" rel="noopener">tx ↗</a></div>`;
+        const label = l.symbol
+          ? `<b>${l.symbol}</b> <span style="color:var(--text-faint)">${short(l.token)}</span>`
+          : `${short(l.token)} <span style="color:var(--text-faint)">(name unavailable)</span>`;
+        html += `<div class="row"><span class="t">${label}</span><span class="time">${l.block.Time.slice(0,16).replace('T',' ')}</span><a class="explorer" href="${explorerTx(l.txHash)}" target="_blank" rel="noopener">tx ↗</a></div>`;
       }
       html += '</div>';
     }
