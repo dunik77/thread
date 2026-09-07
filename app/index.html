@@ -404,6 +404,9 @@ function render(addr, card, history){
     if (history.viaToken){
       html += `<p style="margin:8px 0 0;color:var(--text-faint);font-size:12px;">(resolved from the token address you entered)</p>`;
     }
+    if (history.viaDirectRpc){
+      html += `<p style="margin:8px 0 0;color:var(--text-faint);font-size:12px;">(Bitquery couldn't answer this time -- read directly from the chain instead, see SPEC.md)</p>`;
+    }
     if (history.infra){
       html += `<div class="infra-warning" style="margin-top:12px;"><span class="mark">⚠</span><div><b>${history.infra.name}</b> -- not a person. ${history.infra.reason}</div></div>`;
     }

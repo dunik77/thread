@@ -64,6 +64,10 @@ async function main() {
     console.log(`${input} is a token launched by ${result.deployer}. Its history:\n`);
   }
 
+  if (result.viaDirectRpc) {
+    console.log(`(Bitquery couldn't answer this time -- read directly from the chain instead, see SPEC.md)\n`);
+  }
+
   if (result.infra) {
     console.log(`⚠  ${result.deployer} is known shared infrastructure: ${result.infra.name}`);
     console.log(`   ${result.infra.reason}`);

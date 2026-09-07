@@ -4,7 +4,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { lookupDeployerHistory } = require("../src/deployer-history.js");
 const { BITQUERY_ENDPOINT } = require("../src/bitquery.js");
-const { PUBLIC_RPC } = require("../src/factory-logs.js");
+const { PUBLIC_RPC, TOKEN_LAUNCHED_TOPIC0, addressToTopic } = require("../src/factory-logs.js");
 
 const MULTICALL3 = "0xca11bde05977b3631167028862be2a173976ca11";
 const REAL_DEPLOYER = "0xdf2237114d595e0bf4d35cbcdebcdf43c55c4669";
@@ -29,14 +29,26 @@ function launchedEvent(token, deployer, txHash, time) {
   };
 }
 
+// A real TokenLaunched eth_getLogs entry's shape -- for tests exercising the
+// src/factory-logs.js fallback path specifically.
+function rawLog(token, curve, deployer, txHash, blockNumberHex) {
+  return {
+    topics: [TOKEN_LAUNCHED_TOPIC0, addressToTopic(token), addressToTopic(curve), addressToTopic(deployer)],
+    blockNumber: blockNumberHex,
+    transactionHash: txHash,
+  };
+}
+
 /**
  * `bitquery(query)` handles calls to Bitquery's endpoint (given the raw
- * GraphQL query string, as before). `rpc(body)` handles calls to the public
- * RPC (given the parsed JSON-RPC body) and defaults to a clean, empty
- * eth_getLogs result -- the "not-found" path's default, since most tests
- * here care about Bitquery's behavior, not the RPC fallback specifically.
+ * GraphQL query string, as before). `rpcLogs(params)` handles eth_getLogs
+ * calls to the public RPC and defaults to a clean, empty result -- the
+ * "not-found" path's default, since most tests here care about Bitquery's
+ * behavior, not the RPC fallback specifically. `eth_getBlockByNumber` calls
+ * (made by src/factory-logs.js to attach real timestamps) are answered
+ * generically since no test here asserts on the actual timestamp value.
  */
-function stubFetch({ bitquery, rpc = () => ({ result: [] }) }) {
+function stubFetch({ bitquery, rpcLogs = () => ({ result: [] }) }) {
   const original = global.fetch;
   global.fetch = async (url, opts) => {
     const body = JSON.parse(opts.body);
@@ -44,7 +56,10 @@ function stubFetch({ bitquery, rpc = () => ({ result: [] }) }) {
       return { json: async () => bitquery(body.query) };
     }
     if (url === PUBLIC_RPC) {
-      return { json: async () => rpc(body) };
+      if (body.method === "eth_getBlockByNumber") {
+        return { json: async () => ({ result: { timestamp: "0x68b9a000" } }) };
+      }
+      return { json: async () => rpcLogs(body.params[0]) };
     }
     throw new Error(`unexpected fetch url in test: ${url}`);
   };
@@ -128,11 +143,12 @@ test("lookupDeployerHistory resolves a token address via its deployer", async ()
   }
 });
 
-test("lookupDeployerHistory still reports a confirmed deployer when the follow-up launch-list query fails", async () => {
+test("lookupDeployerHistory recovers real launch data via direct RPC when Bitquery's follow-up query fails", async () => {
   // The real bug, 2026-09-07: a real token ("Pushin'") resolved its deployer
   // fine via the token-argument query, then the follow-up query for that
-  // deployer's other launches timed out -- and an unwrapped await turned
-  // that into a thrown exception instead of a partial, still-useful result.
+  // deployer's other launches timed out. Fixed twice over: first so it
+  // didn't crash (M1.7), then so it recovers the real launch list from a
+  // direct chain check instead of settling for an empty one (M1.8).
   const restore = stubFetch({
     bitquery: (query) => {
       if (query.includes('Name: {is: "token"}')) {
@@ -143,14 +159,46 @@ test("lookupDeployerHistory still reports a confirmed deployer when the follow-u
       }
       return { data: { EVM: { Events: [] } } };
     },
+    rpcLogs: (params) => {
+      const isDeployerPosition = params.topics[3] !== null;
+      return {
+        result: isDeployerPosition ? [rawLog(REAL_TOKEN, "0x0000000000000000000000000000000000000001", REAL_DEPLOYER, "0xtx1", "0x1")] : [],
+      };
+    },
   });
   try {
     const result = await lookupDeployerHistory(REAL_TOKEN, "fake-key");
     assert.equal(result.status, "resolved");
     assert.equal(result.viaToken, true);
     assert.equal(result.deployer, REAL_DEPLOYER);
+    assert.equal(result.viaDirectRpc, true);
+    assert.equal(result.partial, undefined);
+    assert.equal(result.launches.length, 1);
+    assert.equal(result.launches[0].token, REAL_TOKEN.toLowerCase());
+  } finally {
+    restore();
+  }
+});
+
+test("lookupDeployerHistory reports a genuinely partial result when both Bitquery's follow-up AND the direct RPC check fail", async () => {
+  const restore = stubFetch({
+    bitquery: (query) => {
+      if (query.includes('Name: {is: "token"}')) {
+        return { data: { EVM: { Events: [launchedEvent(REAL_TOKEN, REAL_DEPLOYER, "0xtx1", "2026-09-05T00:00:00Z")] } } };
+      }
+      if (query.includes('Name: {is: "deployer"}') && query.includes(REAL_DEPLOYER)) {
+        return { errors: [{ message: "context deadline exceeded (Client.Timeout or context cancellation while reading body)" }] };
+      }
+      return { data: { EVM: { Events: [] } } };
+    },
+    rpcLogs: () => ({ error: { message: "connection reset" } }),
+  });
+  try {
+    const result = await lookupDeployerHistory(REAL_TOKEN, "fake-key");
+    assert.equal(result.status, "resolved");
+    assert.equal(result.deployer, REAL_DEPLOYER);
     assert.equal(result.partial, true);
-    assert.match(result.partialReason, /follow-up query/);
+    assert.match(result.partialReason, /listing the deployer's other launches failed both/);
     assert.deepEqual(result.launches, []);
   } finally {
     restore();
@@ -162,7 +210,7 @@ test("lookupDeployerHistory reports not-found when Bitquery is inconclusive but 
     bitquery: () => ({
       errors: [{ message: "context deadline exceeded (Client.Timeout exceeded while awaiting headers)" }],
     }),
-    rpc: () => ({ result: [] }), // clean, empty -- the real "snowball capital" case
+    rpcLogs: () => ({ result: [] }), // clean, empty -- the real "snowball capital" case
   });
   try {
     const result = await lookupDeployerHistory("0x3FBf37267A7a0f54B9062a465A997e4698925910", "fake-key");
@@ -173,12 +221,37 @@ test("lookupDeployerHistory reports not-found when Bitquery is inconclusive but 
   }
 });
 
+test("lookupDeployerHistory resolves via direct RPC when Bitquery fails entirely but the chain confirms a deployer", async () => {
+  const restore = stubFetch({
+    bitquery: () => ({
+      errors: [{ message: "context deadline exceeded (Client.Timeout exceeded while awaiting headers)" }],
+    }),
+    rpcLogs: (params) => {
+      const isDeployerPosition = params.topics[3] !== null;
+      return {
+        result: isDeployerPosition
+          ? [rawLog("0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222", REAL_DEPLOYER, "0xtx1", "0x1")]
+          : [],
+      };
+    },
+  });
+  try {
+    const result = await lookupDeployerHistory(REAL_DEPLOYER, "fake-key");
+    assert.equal(result.status, "resolved");
+    assert.equal(result.viaToken, false);
+    assert.equal(result.viaDirectRpc, true);
+    assert.equal(result.launches.length, 1);
+  } finally {
+    restore();
+  }
+});
+
 test("lookupDeployerHistory stays inconclusive when both Bitquery and the direct RPC check fail", async () => {
   const restore = stubFetch({
     bitquery: () => ({
       errors: [{ message: "context deadline exceeded (Client.Timeout exceeded while awaiting headers)" }],
     }),
-    rpc: () => ({ error: { message: "connection reset" } }),
+    rpcLogs: () => ({ error: { message: "connection reset" } }),
   });
   try {
     const result = await lookupDeployerHistory("0x385F4f8ae47651ce5F58F5265395a669f8281e18", "fake-key");
