@@ -1,0 +1,14 @@
+{
+  "name": "thread",
+  "version": "0.1.0",
+  "private": true,
+  "description": "New wallets. Familiar connections. A protocol-native history of Pons v2 launches on Robinhood Chain.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {}
+}
