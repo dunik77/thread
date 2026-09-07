@@ -68,9 +68,13 @@ See an [illustrative case file](docs/example-case.md) for the intended output in
 
 The unit thread produces — one launch, its prior history, its evidence — is specified in [docs/case-file-format.md](docs/case-file-format.md). That format is stable even before any code reads it; it's the contract between this spec and whatever renders it later, on a page or as a shareable card.
 
+## Try it
+
+[lookup/index.html](lookup/index.html) is real and live: paste any Robinhood Chain address and it reads name, symbol, supply, and contract type straight from the public RPC — no deployer history or fee graph yet, just what a single chain read can tell you today. [STATUS.md](STATUS.md) tracks the gap between this and the full case file.
+
 ## Status
 
-Nothing here runs yet. [STATUS.md](STATUS.md) tracks what's specified versus built, milestone by milestone, and is updated as pieces move from "designed" to "working" — not before.
+Most of this doesn't run yet. [STATUS.md](STATUS.md) tracks what's specified versus built, milestone by milestone, and is updated as pieces move from "designed" to "working" — not before.
 
 ## Contributing
 

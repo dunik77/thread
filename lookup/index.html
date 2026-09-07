@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>thread — token lookup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ink:#1a1613;
+    --paper:#241f19;
+    --paper-raised:#2c261f;
+    --line:#3a3226;
+    --text:#ede3d3;
+    --text-dim:#a89a80;
+    --text-faint:#6e6252;
+    --accent:#c99a44;
+    --accent-dim:#8a6b2e;
+    --good:#5b8c74;
+    --warn:#b9683a;
+    --critical:#9c4a42;
+    --serif:'IBM Plex Serif',Georgia,'Times New Roman',serif;
+    --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    --mono:'IBM Plex Mono','SF Mono',Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:14px;
+    line-height:1.5;
+  }
+  .app{max-width:760px;margin:0 auto;padding:28px 24px 64px;}
+
+  header{padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:22px;}
+  header h1{font-family:var(--serif);font-weight:700;font-size:26px;margin:0 0 6px;text-wrap:balance;}
+  header p{color:var(--text-dim);margin:0;max-width:56ch;font-size:13.5px;}
+  header .chain-tag{font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-top:10px;}
+
+  .lookup-box{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:18px;
+    margin-bottom:20px;
+  }
+  .lookup-row{display:flex;gap:8px;}
+  input[type=text]{
+    flex:1;
+    background:var(--ink);
+    border:1px solid var(--line);
+    border-radius:4px;
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:13px;
+    padding:10px 12px;
+  }
+  input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  button.go{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:13px;
+    background:var(--accent);
+    color:#1a1613;
+    border:none;
+    border-radius:4px;
+    padding:0 20px;
+    cursor:pointer;
+  }
+  button.go:hover{background:#dcae57;}
+  button.go:disabled{background:var(--accent-dim);cursor:default;}
+
+  .quickfill{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .chip{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--text-dim);
+    background:var(--ink);
+    border:1px solid var(--line);
+    border-radius:99px;
+    padding:5px 11px;
+    cursor:pointer;
+  }
+  .chip:hover{border-color:var(--accent-dim);color:var(--text);}
+
+  .status-line{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--text-faint);
+    margin:10px 2px 0;
+    min-height:16px;
+  }
+  .status-line.err{color:var(--critical);}
+
+  .result{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:22px 24px;
+  }
+  .result-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    padding-bottom:14px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+  .result-head h2{font-family:var(--serif);font-size:22px;margin:0 0 4px;}
+  .result-head .sym{font-family:var(--mono);color:var(--accent);font-size:14px;}
+  .pill{
+    font-family:var(--mono);
+    font-size:10.5px;
+    padding:3px 9px;
+    border-radius:99px;
+    border:1px solid currentColor;
+    white-space:nowrap;
+  }
+  .pill.contract{color:var(--good);}
+  .pill.eoa{color:var(--text-dim);}
+  .pill.proxy{color:var(--accent);}
+
+  .field{
+    display:grid;
+    grid-template-columns:140px 1fr;
+    gap:12px;
+    padding:9px 0;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .field:last-child{border-bottom:none;}
+  .field .k{color:var(--text-faint);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;}
+  .field .v{font-family:var(--mono);color:var(--text);word-break:break-all;font-variant-numeric:tabular-nums;}
+  .field .v.muted{color:var(--text-faint);font-style:italic;font-family:var(--sans);}
+
+  .scope-note{
+    margin-top:16px;
+    padding-top:14px;
+    border-top:1px dashed var(--line);
+    font-size:12px;
+    color:var(--text-faint);
+  }
+  .scope-note b{color:var(--text-dim);}
+
+  .empty{color:var(--text-faint);font-style:italic;font-size:13px;padding:30px 4px;text-align:center;}
+
+  footer{margin-top:20px;font-family:var(--mono);font-size:11px;color:var(--text-faint);}
+  footer a{color:var(--accent-dim);}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>thread — token lookup</h1>
+    <p>Paste a Pons v2 token address to read what's actually on chain right now: contract type, name, symbol, supply, and whether it's a proxy clone. Live reads against the public Robinhood Chain RPC — nothing here is cached or invented.</p>
+    <p class="chain-tag">robinhood chain · id 4663 · rpc.mainnet.chain.robinhood.com</p>
+  </header>
+
+  <div class="lookup-box">
+    <div class="lookup-row">
+      <input type="text" id="addrInput" placeholder="0x..." spellcheck="false" autocomplete="off">
+      <button class="go" id="goBtn">Look up</button>
+    </div>
+    <div class="quickfill" id="quickfill"></div>
+    <div class="status-line" id="statusLine"></div>
+  </div>
+
+  <div id="output"><div class="empty">No lookup yet. Paste an address above or pick one of the examples.</div></div>
+
+  <footer>reads eth_getCode / eth_call over public JSON-RPC · see <a href="../SPEC.md">SPEC.md</a> for what's planned beyond this (deployer history, fee-escrow graph)</footer>
+</div>
+
+<script>
+const RPC = "https://rpc.mainnet.chain.robinhood.com";
+const EXAMPLES = [
+  "0x385F4f8ae47651ce5F58F5265395a669f8281e18",
+  "0x39dBED3a2bd333467115dE45665cC57F813C4571",
+  "0x020bfC650A365f8BB26819deAAbF3E21291018b4"
+];
+
+const addrInput = document.getElementById('addrInput');
+const goBtn = document.getElementById('goBtn');
+const statusLine = document.getElementById('statusLine');
+const output = document.getElementById('output');
+const quickfill = document.getElementById('quickfill');
+
+quickfill.innerHTML = EXAMPLES.map(a =>
+  `<button class="chip" data-a="${a}">${short(a)}</button>`
+).join('');
+quickfill.querySelectorAll('.chip').forEach(c => {
+  c.addEventListener('click', () => { addrInput.value = c.dataset.a; run(); });
+});
+
+goBtn.addEventListener('click', run);
+addrInput.addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+
+function short(a){ return a.slice(0,8) + '…' + a.slice(-6); }
+function isAddress(a){ return /^0x[0-9a-fA-F]{40}$/.test(a); }
+
+async function rpc(method, params){
+  const res = await fetch(RPC, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ jsonrpc:'2.0', id:1, method, params })
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message || 'RPC error');
+  return json.result;
+}
+
+function decodeString(hex){
+  try{
+    const h = hex.slice(2);
+    const len = parseInt(h.slice(64,128), 16);
+    const data = h.slice(128, 128 + len*2);
+    const bytes = data.match(/.{1,2}/g).map(b => parseInt(b,16));
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  }catch(e){ return null; }
+}
+
+function detectMinimalProxy(code){
+  // EIP-1167 and common vanity-clone variants: short bytecode with a PUSH20 (0x73)
+  // opcode carrying the implementation address, immediately before the DELEGATECALL.
+  const body = code.slice(2);
+  if (body.length > 200) return null; // real implementations are much longer
+  for (let i = 0; i + 2 <= body.length; i += 2){
+    if (body.slice(i, i+2) === '73' && i + 2 + 40 <= body.length){
+      const candidate = body.slice(i+2, i+2+40);
+      if (body.includes('5af4')) return '0x' + candidate; // 5af4 = DELEGATECALL
+    }
+  }
+  return null;
+}
+
+async function run(){
+  const addr = addrInput.value.trim();
+  if (!isAddress(addr)){
+    statusLine.textContent = 'Not a valid 0x address (need 40 hex characters).';
+    statusLine.className = 'status-line err';
+    return;
+  }
+  statusLine.className = 'status-line';
+  statusLine.textContent = 'reading chain…';
+  goBtn.disabled = true;
+
+  try{
+    const [code, blockHex] = await Promise.all([
+      rpc('eth_getCode', [addr, 'latest']),
+      rpc('eth_blockNumber', [])
+    ]);
+    const block = parseInt(blockHex, 16);
+    const isContract = code && code !== '0x';
+
+    if (!isContract){
+      const [balHex, nonceHex] = await Promise.all([
+        rpc('eth_getBalance', [addr, 'latest']),
+        rpc('eth_getTransactionCount', [addr, 'latest'])
+      ]);
+      const eth = parseInt(balHex, 16) / 1e18;
+      renderEOA(addr, eth, parseInt(nonceHex,16), block);
+      statusLine.textContent = `read at block ${block.toLocaleString()}`;
+      return;
+    }
+
+    const proxyTarget = detectMinimalProxy(code);
+    const selectors = { name:'0x06fdde03', symbol:'0x95d89b41', decimals:'0x313ce567', totalSupply:'0x18160ddd' };
+    const calls = await Promise.allSettled(
+      Object.entries(selectors).map(([k,sel]) => rpc('eth_call', [{to:addr, data:sel}, 'latest']).then(r => [k,r]))
+    );
+    const values = {};
+    for (const c of calls){
+      if (c.status === 'fulfilled'){
+        const [k, raw] = c.value;
+        values[k] = (k === 'name' || k === 'symbol') ? decodeString(raw) : raw;
+      }
+    }
+
+    renderContract(addr, code, block, proxyTarget, values);
+    statusLine.textContent = `read at block ${block.toLocaleString()}`;
+  }catch(err){
+    statusLine.className = 'status-line err';
+    statusLine.textContent = 'RPC read failed: ' + err.message;
+  }finally{
+    goBtn.disabled = false;
+  }
+}
+
+function renderEOA(addr, eth, nonce, block){
+  output.innerHTML = `
+    <div class="result">
+      <div class="result-head">
+        <div>
+          <h2>Not a contract</h2>
+          <div class="sym">wallet address</div>
+        </div>
+        <span class="pill eoa">EOA</span>
+      </div>
+      <div class="field"><div class="k">Address</div><div class="v">${addr}</div></div>
+      <div class="field"><div class="k">Balance</div><div class="v">${eth.toFixed(6)} ETH</div></div>
+      <div class="field"><div class="k">Nonce</div><div class="v">${nonce} (transactions sent)</div></div>
+      <div class="field"><div class="k">Block</div><div class="v">${block.toLocaleString()}</div></div>
+      <div class="scope-note">This address has no bytecode — it's a regular wallet, not a token. If you meant to paste a token's contract address, double-check it.</div>
+    </div>`;
+}
+
+function renderContract(addr, code, block, proxyTarget, v){
+  const hasErc20 = v.name || v.symbol || v.totalSupply;
+  const supply = v.totalSupply ? (BigInt(v.totalSupply) / (10n ** BigInt(v.decimals ? parseInt(v.decimals,16) : 18))).toString() : null;
+  const decimals = v.decimals ? parseInt(v.decimals, 16) : null;
+
+  output.innerHTML = `
+    <div class="result">
+      <div class="result-head">
+        <div>
+          <h2>${v.name || '(name unavailable)'}</h2>
+          <div class="sym">${v.symbol || ''}</div>
+        </div>
+        <span class="pill ${proxyTarget ? 'proxy' : 'contract'}">${proxyTarget ? 'proxy clone' : 'contract'}</span>
+      </div>
+      <div class="field"><div class="k">Address</div><div class="v">${addr}</div></div>
+      ${proxyTarget ? `<div class="field"><div class="k">Implementation</div><div class="v">${proxyTarget}</div></div>` : ''}
+      <div class="field"><div class="k">Decimals</div><div class="v">${decimals !== null ? decimals : '—'}</div></div>
+      <div class="field"><div class="k">Total supply</div><div class="v">${supply ? Number(supply).toLocaleString() + ' ' + (v.symbol||'') : '—'}</div></div>
+      <div class="field"><div class="k">Bytecode size</div><div class="v">${(code.length-2)/2} bytes</div></div>
+      <div class="field"><div class="k">Block</div><div class="v">${block.toLocaleString()}</div></div>
+      ${!hasErc20 ? `<div class="field"><div class="k">Note</div><div class="v muted">Contract exists but did not respond to standard ERC-20 read calls — it may use a non-standard interface.</div></div>` : ''}
+      <div class="scope-note">
+        <b>What this shows:</b> live ERC-20 metadata and contract type only, read directly from the chain.<br>
+        <b>Not shown yet:</b> deployer address, launch/graduation history, or fee-escrow recipients — that needs indexing beyond a single RPC read. See <a href="../SPEC.md" style="color:var(--accent-dim)">SPEC.md</a> and <a href="../STATUS.md" style="color:var(--accent-dim)">STATUS.md</a> for that work.
+      </div>
+    </div>`;
+}
+</script>
+</body>
+</html>
