@@ -99,6 +99,26 @@ The next four biggest repeaters (5, 4, 3, and 3 launches) turned out to be a dif
 distinct [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702) delegated accounts, not shared contracts — real
 repeat behavior, kept as-is. Full writeup in [SPEC.md](SPEC.md) "Open questions."
 
+## Measured, not claimed
+
+Everything in this table came out of a real run against live data on 2026-09-07, and the method for
+each is written down in [SPEC.md](SPEC.md) or [STATUS.md](STATUS.md) rather than left as a number to
+be taken on faith.
+
+| | |
+|---|---|
+| launches sampled | 300 consecutive, live via Bitquery |
+| unique deployers in that sample | 275 |
+| deployers with more than one launch | 12 |
+| biggest repeater | 8 launches — and **not a person**: Multicall3 |
+| next four repeaters | 5, 4, 3, 3 — real EIP-7702 accounts, kept |
+| tests | 55, all offline, none touching a network |
+| runtime dependencies | 0 |
+| typical lookup | 15–30s, bounded by Bitquery's free tier, not by this code |
+| addresses this repo claims are Pons v2 launches without checking | 0 |
+
+That last row is the one the rest of the project is built around.
+
 ## What a lookup gives you
 
 Paste a token or deployer address and three cards come back. **Contract**: name, symbol, supply, and whether
@@ -128,6 +148,39 @@ Both data sources can still fail at once, including from this project's own test
 also free and rate-limited, and a same-session attempt to bisect for the factory's exact deployment block
 (to narrow future scans away from genesis) tripped that limit and got abandoned rather than shipped on the
 corrupted result it produced. See STATUS.md's "known limitation" entry.
+
+## How it works
+
+Two data sources, and a hard rule about what happens when they disagree or go quiet.
+
+```mermaid
+flowchart TD
+    IN["0x… address in<br/>token or deployer, either works"] --> RACE
+
+    RACE{"Bitquery<br/>as-deployer and as-token,<br/>raced in parallel"}
+    RACE -->|"matched as deployer"| INFRA
+    RACE -->|"matched as token"| FOLLOW["fetch that deployer's<br/>other launches"]
+    RACE -->|"neither answered"| RPC
+
+    FOLLOW -->|"ok"| INFRA
+    FOLLOW -->|"timed out"| RPC
+
+    RPC{"direct eth_getLogs<br/>on the factory,<br/>both argument positions"}
+    RPC -->|"real matches"| INFRA
+    RPC -->|"clean, and empty"| NF["<b>not a Pons v2 launch</b><br/>a checked negative"]
+    RPC -->|"also failed"| INC["<b>inconclusive</b><br/>never a guessed negative"]
+
+    INFRA{"known shared<br/>infrastructure?"}
+    INFRA -->|"yes"| WARN["flagged, not counted<br/>as one person"]
+    INFRA -->|"no"| CASE
+    WARN --> CASE["<b>case file</b><br/>deployer · launches · tx links"]
+```
+
+The branch worth reading twice is the one on the right. A lookup that fails is not a lookup that
+found nothing, and the difference is the difference between "this address is clean" and "ask me
+later." Bitquery's realtime tier was observed timing out on genuine zero-match queries rather than
+returning an empty list, so a timeout alone can never produce a negative here — the chain has to be
+asked directly, and it has to answer, before thread will say a thing isn't there.
 
 ## Why fee-recipient clusters aren't there yet
 
@@ -184,6 +237,26 @@ Known Pons v2 contracts this spec and reader are written against (Robinhood Chai
 | `PonsV2MemeHook` | `0xe5e702641ea86f4ae6cc3cdaed2b886f976be044` |
 | locker | `0x267444d099b10fb5ed7c3cc7b7c767adca574952` |
 | public RPC | `https://rpc.mainnet.chain.robinhood.com` |
+
+## What's in here
+
+| path | what it is |
+|---|---|
+| [`src/deployer-history.js`](src/deployer-history.js) | the resolve logic: the Bitquery race, the RPC fallback, the infra check, and the four answers it can give |
+| [`src/factory-logs.js`](src/factory-logs.js) | the second opinion — `eth_getLogs` straight at the factory, constrained to the real `TokenLaunched` signature |
+| [`src/bitquery.js`](src/bitquery.js) | query building and the one network call, kept apart so the queries stay testable |
+| [`src/known-infra.js`](src/known-infra.js) | the short list of contracts that are not people, with the evidence for each |
+| [`src/chain-read.js`](src/chain-read.js) | ERC-20 and minimal-proxy decoding from raw hex |
+| [`src/env.js`](src/env.js) | a 30-line `.env` parser, so the dependency count stays zero |
+| [`server.js`](server.js) | the service: one page, one JSON route, no framework |
+| [`app/index.html`](app/index.html) | the page you actually click |
+| [`lookup/index.html`](lookup/index.html) | key-free ERC-20 reader that opens straight from disk |
+| [`demo/index.html`](demo/index.html) | the fictional full case file, clearly marked as fixture data |
+| [`scripts/deployer-history.js`](scripts/deployer-history.js) | the same lookup, from a terminal |
+| [`scripts/screenshot.js`](scripts/screenshot.js) | regenerates the screenshot above by driving a real browser through a real lookup |
+| [`RULES.md`](RULES.md) | the seven language rules this project holds itself to |
+| [`SPEC.md`](SPEC.md) | the data model, the contracts it reads, and the open questions |
+| [`STATUS.md`](STATUS.md) | what is built and what is not, milestone by milestone, including what was abandoned |
 
 ## Tests
 

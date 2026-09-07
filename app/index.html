@@ -158,6 +158,15 @@ quickfill.querySelectorAll('.chip').forEach(c => {
 goBtn.addEventListener('click', run);
 addrInput.addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
 
+// ?address=0x... runs the lookup straight away, so a finding can be handed
+// to someone as a link instead of "paste this in yourself". Also what makes
+// the README screenshot a real capture rather than a mocked-up one.
+const deepLink = new URLSearchParams(location.search).get('address');
+if (deepLink) {
+  addrInput.value = deepLink;
+  run();
+}
+
 function short(a){ return a.slice(0,8) + '…' + a.slice(-6); }
 function escapeHtml(value){
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
