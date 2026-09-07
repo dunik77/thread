@@ -48,10 +48,12 @@ function flattenArguments(event) {
  */
 async function runQuery(query, apiKey) {
   const res = await fetch(BITQUERY_ENDPOINT, {
+    signal: AbortSignal.timeout(12000),
     method: "POST",
     headers: { "Content-Type": "application/json", "X-API-KEY": apiKey },
     body: JSON.stringify({ query }),
   });
+  if (res.ok === false) throw new Error(`Bitquery HTTP ${res.status}`);
   const json = await res.json();
   if (json.errors) {
     throw new Error(json.errors.map((e) => e.message).join("; "));

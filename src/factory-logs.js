@@ -64,14 +64,17 @@ function buildFactoryLogFilter(address, position) {
 /** Runs one eth_getLogs filter against the public RPC. Throws on an RPC-level error. */
 async function runFilter(params) {
   const res = await fetch(PUBLIC_RPC, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [params] }),
   });
+  if (res.ok === false) throw new Error(`RPC HTTP ${res.status}`);
   const json = await res.json();
   if (json.error) {
     throw new Error(json.error.message || "RPC error");
   }
+  if (!Array.isArray(json.result)) throw new Error("RPC returned no log array");
   return json.result;
 }
 
@@ -106,20 +109,23 @@ async function attachBlockTimes(launches) {
   const uniqueBlocks = [...new Set(launches.map((l) => l._blockNumberHex))];
   const times = await Promise.all(
     uniqueBlocks.map(async (blockHex) => {
-      const res = await fetch(PUBLIC_RPC, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "eth_getBlockByNumber",
-          params: [blockHex, false],
-        }),
-      });
-      const json = await res.json();
-      if (json.error || !json.result) return [blockHex, null];
-      const iso = new Date(parseInt(json.result.timestamp, 16) * 1000).toISOString();
-      return [blockHex, iso];
+      try {
+        const res = await fetch(PUBLIC_RPC, {
+          signal: AbortSignal.timeout(5000),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "eth_getBlockByNumber",
+            params: [blockHex, false],
+          }),
+        });
+        const json = await res.json();
+        if (res.ok === false || json.error || !json.result || !parseInt(json.result.timestamp, 16)) return [blockHex, null];
+        const iso = new Date(parseInt(json.result.timestamp, 16) * 1000).toISOString();
+        return [blockHex, iso];
+      } catch { return [blockHex, null]; }
     })
   );
   const byBlock = Object.fromEntries(times);
@@ -127,6 +133,11 @@ async function attachBlockTimes(launches) {
     const { _blockNumberHex, ...rest } = l;
     return { ...rest, block: { ...rest.block, Time: byBlock[_blockNumberHex] || null } };
   });
+}
+
+async function readDeployerLaunches(address) {
+  const logs = await runFilter(buildFactoryLogFilter(address, 3));
+  return attachBlockTimes(logs.map(parseLaunchLog));
 }
 
 /**
@@ -161,4 +172,5 @@ module.exports = {
   buildFactoryLogFilter,
   parseLaunchLog,
   checkAddressAgainstFactory,
+  readDeployerLaunches,
 };

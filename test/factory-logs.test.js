@@ -153,3 +153,18 @@ test("checkAddressAgainstFactory throws if the RPC itself errors, rather than re
     global.fetch = original;
   }
 });
+
+test("timestamp fetch failure cannot discard confirmed launches", async () => {
+  const original = global.fetch;
+  global.fetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    if (body.method === "eth_getBlockByNumber") throw new Error("rate limited");
+    return { json: async () => ({ result: body.params[0].topics[3]
+      ? [fakeLog(REAL_TOKEN, REAL_DEPLOYER, REAL_DEPLOYER, "0xtx", "0x1")] : [] }) };
+  };
+  try {
+    const result = await checkAddressAgainstFactory(REAL_DEPLOYER);
+    assert.equal(result.asDeployer.length, 1);
+    assert.equal(result.asDeployer[0].block.Time, null);
+  } finally { global.fetch = original; }
+});

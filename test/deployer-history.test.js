@@ -198,8 +198,9 @@ test("lookupDeployerHistory reports a genuinely partial result when both Bitquer
     assert.equal(result.status, "resolved");
     assert.equal(result.deployer, REAL_DEPLOYER);
     assert.equal(result.partial, true);
-    assert.match(result.partialReason, /listing the deployer's other launches failed both/);
-    assert.deepEqual(result.launches, []);
+    assert.match(result.partialReason, /other launches failed/);
+    assert.equal(result.launches.length, 1);
+    assert.equal(result.launches[0].token, REAL_TOKEN);
   } finally {
     restore();
   }
@@ -306,4 +307,54 @@ test("lookupDeployerHistory defaults to a limit of 30, lower than the query's ow
   } finally {
     restore();
   }
+});
+
+test("token resolved by RPC automatically loads the deployer's other tokens", async () => {
+  const other = "0x1111111111111111111111111111111111111111";
+  const curve = "0x2222222222222222222222222222222222222222";
+  const seed = rawLog(REAL_TOKEN, curve, REAL_DEPLOYER, "0xtx1", "0x1");
+  const restore = stubFetch({
+    bitquery: () => ({ errors: [{ message: "indexer offline" }] }),
+    rpcLogs: params => ({ result:
+      params.topics[1] === addressToTopic(REAL_TOKEN) ? [seed] :
+      params.topics[3] === addressToTopic(REAL_DEPLOYER)
+        ? [seed, rawLog(other, curve, REAL_DEPLOYER, "0xtx2", "0x2")] : [] }),
+  });
+  try {
+    const result = await lookupDeployerHistory(REAL_TOKEN, "fake-key");
+    assert.equal(result.status, "resolved");
+    assert.equal(result.partial, undefined);
+    assert.equal(result.viaDirectRpc, true);
+    assert.deepEqual(result.launches.map(l => l.token), [other, REAL_TOKEN]);
+  } finally { restore(); }
+});
+
+test("empty indexed history for a confirmed token falls back to RPC", async () => {
+  const restore = stubFetch({
+    bitquery: query => ({ data: { EVM: { Events: query.includes('Name: {is: "token"}')
+      ? [launchedEvent(REAL_TOKEN, REAL_DEPLOYER, "0xtx1", "2026-09-05T00:00:00Z")] : [] } } }),
+    rpcLogs: params => ({ result: params.topics[3] === addressToTopic(REAL_DEPLOYER)
+      ? [rawLog(REAL_TOKEN, REAL_DEPLOYER, REAL_DEPLOYER, "0xtx1", "0x1")] : [] }),
+  });
+  try {
+    const result = await lookupDeployerHistory(REAL_TOKEN, "fake-key");
+    assert.equal(result.viaDirectRpc, true);
+    assert.equal(result.launches.length, 1);
+  } finally { restore(); }
+});
+
+test("RPC token evidence survives a failed deployer-history follow-up", async () => {
+  const restore = stubFetch({
+    bitquery: () => ({ errors: [{ message: "offline" }] }),
+    rpcLogs: params => params.topics[3] === addressToTopic(REAL_DEPLOYER)
+      ? { error: { message: "rate limited" } }
+      : { result: params.topics[1] === addressToTopic(REAL_TOKEN)
+        ? [rawLog(REAL_TOKEN, REAL_DEPLOYER, REAL_DEPLOYER, "0xtx1", "0x1")] : [] },
+  });
+  try {
+    const result = await lookupDeployerHistory(REAL_TOKEN, "fake-key");
+    assert.equal(result.status, "resolved");
+    assert.equal(result.partial, true);
+    assert.equal(result.launches[0].token, REAL_TOKEN);
+  } finally { restore(); }
 });

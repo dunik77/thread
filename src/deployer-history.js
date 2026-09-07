@@ -3,7 +3,50 @@
 const { isAddress } = require("./chain-read.js");
 const { buildLaunchQuery, flattenArguments, runQuery } = require("./bitquery.js");
 const { checkKnownInfra } = require("./known-infra.js");
-const { checkAddressAgainstFactory } = require("./factory-logs.js");
+const { checkAddressAgainstFactory, readDeployerLaunches } = require("./factory-logs.js");
+
+function fromEvent(event) {
+  const args = flattenArguments(event);
+  return { token: args.token, curve: args.curve, deployer: args.deployer,
+    pairToken: args.pairToken, block: event.Block, txHash: event.Transaction.Hash };
+}
+
+// Once a token is confirmed, never discard that evidence if history fails.
+async function resolveTokenHistory(input, seed, apiKey, limit, viaDirectRpc = false) {
+  const deployer = seed.deployer;
+  const base = { status: "resolved", input, deployer, viaToken: true,
+    infra: checkKnownInfra(deployer), hitLimit: false };
+  let indexedError = "indexer unavailable";
+  if (!viaDirectRpc) {
+    try {
+      const { query } = buildLaunchQuery("deployer", deployer, { limit });
+      const events = await runQuery(query, apiKey);
+      // An empty list contradicts the launch we just resolved: try RPC.
+      if (events.length) {
+        const launches = mergeLaunches(events.map(fromEvent), [seed]);
+        return { ...base, launches, hitLimit: events.length === limit };
+      }
+      indexedError = "indexer returned no history for a confirmed deployer";
+    } catch (err) { indexedError = err.message; }
+  }
+  try {
+    const launches = await readDeployerLaunches(deployer);
+    if (!launches.length) throw new Error("no history returned for a confirmed deployer");
+    return { ...base, launches: mergeLaunches(launches, [seed]), viaDirectRpc: true };
+  } catch (err) {
+    return { ...base, launches: [seed], ...(viaDirectRpc ? { viaDirectRpc: true } : {}),
+      partial: true, partialReason: `Showing the confirmed launch. Loading the deployer's other launches failed: ${indexedError}; RPC: ${err.message}. Retry to load the remaining history.` };
+  }
+}
+
+function mergeLaunches(...lists) {
+  const seen = new Map();
+  for (const launch of lists.flat()) {
+    const key = launch.token.toLowerCase();
+    if (!seen.has(key)) seen.set(key, launch);
+  }
+  return [...seen.values()].sort((a, b) => Number(b.block?.Number || 0) - Number(a.block?.Number || 0));
+}
 
 /**
  * The shared core of M1, used by both scripts/deployer-history.js (CLI) and
@@ -69,7 +112,7 @@ async function lookupDeployerHistory(input, apiKey, { limit = 30 } = {}) {
   const tokenAttempt = (async () => {
     const { query } = buildLaunchQuery("token", input, { limit: 1 });
     const events = await runQuery(query, apiKey);
-    return events.length > 0 ? flattenArguments(events[0]).deployer : null;
+    return events.length > 0 ? fromEvent(events[0]) : null;
   })();
 
   const [deployerResult, tokenResult] = await Promise.allSettled([deployerAttempt, tokenAttempt]);
@@ -82,77 +125,13 @@ async function lookupDeployerHistory(input, apiKey, { limit = 30 } = {}) {
       deployer: input,
       viaToken: false,
       infra: checkKnownInfra(input),
-      launches: launches.map(flattenArguments).map((args, i) => ({
-        token: args.token,
-        curve: args.curve,
-        pairToken: args.pairToken,
-        block: launches[i].Block,
-        txHash: launches[i].Transaction.Hash,
-      })),
+      launches: mergeLaunches(launches.map(fromEvent)),
       hitLimit: launches.length === limit,
     };
   }
 
   if (tokenResult.status === "fulfilled" && tokenResult.value) {
-    const deployer = tokenResult.value;
-    // This confirms `input` IS a real Pons v2 token -- the token-argument
-    // query only succeeds on a real match. Everything from here is a
-    // follow-up enrichment query (the deployer's *other* launches), and it
-    // can fail independently of that confirmed fact. Found the hard way,
-    // 2026-09-07: a real token ("Pushin'") resolved its deployer correctly
-    // and then this second query timed out.
-    try {
-      const { query } = buildLaunchQuery("deployer", deployer, { limit });
-      const launches = await runQuery(query, apiKey);
-      return {
-        status: "resolved",
-        input,
-        deployer,
-        viaToken: true,
-        infra: checkKnownInfra(deployer),
-        launches: launches.map(flattenArguments).map((args, i) => ({
-          token: args.token,
-          curve: args.curve,
-          pairToken: args.pairToken,
-          block: launches[i].Block,
-          txHash: launches[i].Transaction.Hash,
-        })),
-        hitLimit: launches.length === limit,
-      };
-    } catch (followUpErr) {
-      // Bitquery confirmed the deployer but choked on listing its other
-      // launches -- try the direct chain check for that exact deployer
-      // before settling for an empty list. This is what turns "Pushin'"
-      // from "deployer confirmed, launches: []" into an actual launch list.
-      try {
-        const direct = await checkAddressAgainstFactory(deployer);
-        return {
-          status: "resolved",
-          input,
-          deployer,
-          viaToken: true,
-          infra: checkKnownInfra(deployer),
-          launches: direct.asDeployer,
-          hitLimit: false,
-          viaDirectRpc: true,
-        };
-      } catch (directErr) {
-        return {
-          status: "resolved",
-          input,
-          deployer,
-          viaToken: true,
-          infra: checkKnownInfra(deployer),
-          launches: [],
-          hitLimit: false,
-          partial: true,
-          partialReason:
-            `Confirmed this is a Pons v2 launch and found its deployer, but listing the ` +
-            `deployer's other launches failed both via Bitquery (${followUpErr.message}) and via ` +
-            `a direct chain check (${directErr.message}). Look up again to retry.`,
-        };
-      }
-    }
+    return resolveTokenHistory(input, tokenResult.value, apiKey, limit);
   }
 
   // Neither Bitquery attempt resolved directly. Ask the public RPC before
@@ -183,27 +162,7 @@ async function lookupDeployerHistory(input, apiKey, { limit = 30 } = {}) {
     }
 
     if (direct.asToken.length > 0) {
-      // input is a confirmed token. We know its one launch and its deployer
-      // from this same call, but not necessarily that deployer's OTHER
-      // launches -- getting those would mean a second direct-RPC call on a
-      // data source that's already the fallback, so this stays partial
-      // rather than chaining a third network round trip.
-      const deployer = direct.asToken[0].deployer;
-      return {
-        status: "resolved",
-        input,
-        deployer,
-        viaToken: true,
-        infra: checkKnownInfra(deployer),
-        launches: direct.asToken,
-        hitLimit: false,
-        viaDirectRpc: true,
-        partial: true,
-        partialReason:
-          "Confirmed via a direct chain check (Bitquery couldn't answer) -- this is the launch " +
-          "you searched for, not necessarily this deployer's other launches. Look up the " +
-          "deployer address directly for that.",
-      };
+      return resolveTokenHistory(input, direct.asToken[0], apiKey, limit, true);
     }
 
     return {
