@@ -121,6 +121,17 @@ That last row is the one the rest of the project is built around.
 
 ## What a lookup gives you
 
+<p align="center">
+  <img src="./assets/terminal.png" alt="thread terminal view: 31 real launches traced back to one deployer" width="100%">
+</p>
+
+<p align="center">
+  <sub>A real trace, not a mock-up: one token address in, 31 launches by the same recorded deployer out,
+  every row with its block and transaction. Note what it says out loud — the query limit was reached, rows
+  were hidden to fit the capture, and fee-recipient history isn't implemented.</sub>
+</p>
+
+
 Paste a token or deployer address and three cards come back. **Contract**: name, symbol, supply, and whether
 it's a minimal-proxy clone, read client-side straight off the chain. **Deployer history**: who deployed it
 and what else they've launched, every row named and linked to `robinhoodchain.blockscout.com`, with known
@@ -253,10 +264,18 @@ Known Pons v2 contracts this spec and reader are written against (Robinhood Chai
 | [`lookup/index.html`](lookup/index.html) | key-free ERC-20 reader that opens straight from disk |
 | [`demo/index.html`](demo/index.html) | the fictional full case file, clearly marked as fixture data |
 | [`scripts/deployer-history.js`](scripts/deployer-history.js) | the same lookup, from a terminal |
-| [`scripts/screenshot.js`](scripts/screenshot.js) | regenerates the screenshot above by driving a real browser through a real lookup |
+| [`scripts/screenshot.js`](scripts/screenshot.js) | drives a real browser through a real lookup, for a capture that isn't a mock-up |
+| [`analysis/deployer_reuse.py`](analysis/deployer_reuse.py) | reproduces the sample behind the numbers table: do deployers actually repeat |
+| [`analysis/verify_infra.py`](analysis/verify_infra.py) | reproduces the Multicall3 catch: is this busy "deployer" a person or a router |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | why two data sources, why four answers, and what's deliberately duplicated |
 | [`RULES.md`](RULES.md) | the seven language rules this project holds itself to |
 | [`SPEC.md`](SPEC.md) | the data model, the contracts it reads, and the open questions |
 | [`STATUS.md`](STATUS.md) | what is built and what is not, milestone by milestone, including what was abandoned |
+
+The two Python scripts are there for one reason: the claims in the table above should be checkable by
+someone who doesn't trust them. `verify_infra.py` needs no key at all — point it at
+`0xca11bde05977b3631167028862be2a173976ca11` and it prints the bytecode size and the Multicall
+selectors that settled it, live, in about a second.
 
 ## Tests
 

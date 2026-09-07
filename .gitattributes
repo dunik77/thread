@@ -1,0 +1,10 @@
+# assets/*.html are not application code -- they are the render sources the
+# banner and avatar PNGs are generated from, kept in the repo so the images
+# can be edited and reproduced rather than only replaced. Linguist should
+# read them as documentation, not count them as part of the codebase.
+assets/*.html linguist-documentation
+
+# demo/ is a fixture-data mockup of the finished case file, not the running
+# product. It stays in the repo because it shows the intended shape, but it
+# is not what anyone should read to understand how thread works.
+demo/* linguist-documentation

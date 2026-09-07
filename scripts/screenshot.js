@@ -28,11 +28,12 @@ const path = require("path");
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PORT = 9222;
 const SERVICE = process.env.THREAD_URL || "http://localhost:4663";
+const TERMINAL = process.env.THREAD_VIEW === "terminal";
 // a real token whose deployer has a long, named launch history -- shows the
 // whole product in one frame: contract card, resolved deployer, the list
 const ADDRESS = process.argv[2] || "0xa146cc739a09d0543e7e5b525f8eca26bb518032";
-const OUT = path.join(__dirname, "..", "assets", "screenshot.png");
-const READY_TIMEOUT_MS = 180000;
+const OUT = path.join(__dirname, "..", "assets", TERMINAL ? "terminal.png" : "screenshot.png");
+const READY_TIMEOUT_MS = 300000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -88,6 +89,7 @@ async function main() {
   }
 
   const chrome = spawn(CHROME, [
+    `--user-data-dir=${fs.mkdtempSync(path.join(require('os').tmpdir(), 'thread-capture-'))}`,
     "--headless=new",
     "--disable-gpu",
     "--hide-scrollbars",
@@ -99,7 +101,7 @@ async function main() {
   try {
     await waitForDevTools();
 
-    const url = `${SERVICE}/?address=${ADDRESS}`;
+    const url = `${SERVICE}/${TERMINAL ? 'terminal' : ''}?address=${ADDRESS}${TERMINAL ? '&capture=1' : ''}`;
     const tabRes = await fetch(`http://localhost:${PORT}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
     const tab = await tabRes.json();
 
@@ -108,7 +110,7 @@ async function main() {
     await cdp.send("Page.enable");
     await cdp.send("Runtime.enable");
     await cdp.send("Emulation.setDeviceMetricsOverride", {
-      width: 1000, height: 1200, deviceScaleFactor: 2, mobile: false,
+      width: TERMINAL ? 1440 : 1000, height: 1200, deviceScaleFactor: 2, mobile: false,
     });
 
     console.log(`Looking up ${ADDRESS} in a real browser, waiting for the lookup to finish...`);
@@ -121,7 +123,7 @@ async function main() {
       const { result } = await cdp.send("Runtime.evaluate", {
         expression: `(() => {
           const s = document.getElementById('statusLine');
-          const cards = document.querySelectorAll('#output .card').length;
+          const cards = document.querySelectorAll('${TERMINAL ? '#output .launch' : '#output .card'}').length;
           return s && s.textContent.trim() === 'done' && cards >= 2;
         })()`,
         returnByValue: true,
@@ -137,12 +139,13 @@ async function main() {
     const { contentSize } = await cdp.send("Page.getLayoutMetrics");
     const height = Math.ceil(contentSize.height);
     await cdp.send("Emulation.setDeviceMetricsOverride", {
-      width: 1000, height, deviceScaleFactor: 2, mobile: false,
+      width: TERMINAL ? 1440 : 1000, height, deviceScaleFactor: 2, mobile: false,
     });
 
     const shot = await cdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+    fs.mkdirSync(path.dirname(OUT), { recursive: true });
     fs.writeFileSync(OUT, Buffer.from(shot.data, "base64"));
-    console.log(`Wrote ${path.relative(process.cwd(), OUT)} (1000x${height} at 2x)`);
+    console.log(`Wrote ${path.relative(process.cwd(), OUT)} (${TERMINAL ? 1440 : 1000}x${height} at 2x)`);
 
     cdp.close();
   } finally {

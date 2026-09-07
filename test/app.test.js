@@ -13,9 +13,9 @@ function app() {
       addEventListener() {}, querySelectorAll() { return []; } });
     return elements.get(id);
   } };
-  const context = vm.createContext({ document, AbortSignal, TextDecoder, setTimeout, clearTimeout });
-  const html = fs.readFileSync(path.join(__dirname, "../app/index.html"), "utf8");
-  vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
+  const context = vm.createContext({ document, AbortSignal, TextDecoder, setTimeout, clearTimeout,
+    URLSearchParams, location: { search: "" }, queueMicrotask });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../app/app.js"), "utf8"), context);
   return { context, elements };
 }
 
