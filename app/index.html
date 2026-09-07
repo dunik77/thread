@@ -61,6 +61,8 @@
   .pill.proxy{color:var(--accent);}
   .pill.infra{color:var(--warn);}
   .pill.notbuilt{color:var(--text-faint);}
+  .pill.notfound{color:var(--text-dim);}
+  .pill.unclear{color:var(--warn);}
 
   .field{display:grid;grid-template-columns:130px 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
   .field:last-child{border-bottom:none;}
@@ -367,7 +369,10 @@ function render(addr, card, history){
 
   // -- Deployer history card (real, server-side Bitquery) --
   html += '<div class="card">';
-  html += `<div class="card-head"><h3>Deployer history</h3></div>`;
+  const historyPill = history.status === 'not-found' ? '<span class="pill notfound">not a Pons v2 launch</span>'
+    : history.status === 'inconclusive' ? '<span class="pill unclear">unclear -- try again</span>'
+    : '';
+  html += `<div class="card-head"><h3>Deployer history</h3>${historyPill}</div>`;
   if (history.status === 'resolved'){
     html += `<div class="field"><div class="k">Deployer</div><div class="v"><a href="${explorerAddr(history.deployer)}" target="_blank" rel="noopener">${history.deployer}</a>${copyBtnHtml(history.deployer)}</div></div>`;
     if (history.viaToken){
@@ -387,9 +392,12 @@ function render(addr, card, history){
       }
       html += '</div>';
     }
+  } else if (history.status === 'not-found') {
+    html += `<div class="field"><div class="k">Result</div><div class="v">Not a Pons v2 launch.</div></div>`;
+    html += `<p style="margin:10px 0 0;color:var(--text-faint);font-size:12px;">${history.reason}</p>`;
   } else if (history.status === 'inconclusive') {
-    html += `<div class="field"><div class="k">Result</div><div class="v muted">Inconclusive: ${history.reason}</div></div>`;
-    html += `<p style="margin:10px 0 0;color:var(--text-faint);font-size:12px;">Not a confirmed "not on Pons v2" -- Bitquery's realtime tier times out on some zero-match queries rather than returning empty. See STATUS.md M0 for a definitive method.</p>`;
+    html += `<div class="field"><div class="k">Result</div><div class="v muted">Genuinely unclear: ${history.reason}</div></div>`;
+    html += `<p style="margin:10px 0 0;color:var(--text-faint);font-size:12px;">Both Bitquery and a direct check against the public RPC failed to give a clean answer this time -- not a confirmed negative, not a confirmed launch. Try Look up again.</p>`;
   } else {
     html += `<div class="field"><div class="k">Error</div><div class="v muted">${history.reason || history.error || 'query failed'}</div></div>`;
   }

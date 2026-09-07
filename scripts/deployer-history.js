@@ -47,11 +47,16 @@ async function main() {
 
   const result = await lookupDeployerHistory(input, apiKey);
 
+  if (result.status === "not-found") {
+    console.log(`${input} is not a Pons v2 launch.`);
+    console.log(result.reason);
+    return;
+  }
+
   if (result.status === "inconclusive") {
     console.log(`Couldn't resolve ${input} as either a deployer or a token: ${result.reason}`);
-    console.log('This is inconclusive, not a confirmed "not on Pons v2" -- Bitquery\'s realtime tier appears to');
-    console.log("time out on a zero-match Arguments filter rather than returning an empty list quickly.");
-    console.log("For a definitive negative, check eth_getLogs against the public RPC directly (see STATUS.md M0).");
+    console.log('This is genuinely inconclusive -- both Bitquery and a direct eth_getLogs check against the');
+    console.log("public RPC failed to give a clean answer. Try again, or check STATUS.md M0 for the method.");
     return;
   }
 

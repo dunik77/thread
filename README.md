@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <img alt="tests" src="https://img.shields.io/badge/tests-33%20passing-B7FF00?style=flat-square&labelColor=1a1613">
+  <img alt="tests" src="https://img.shields.io/badge/tests-43%20passing-B7FF00?style=flat-square&labelColor=1a1613">
   <img alt="runtime deps" src="https://img.shields.io/badge/runtime%20deps-0-B7FF00?style=flat-square&labelColor=1a1613">
   <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A518-c99a44?style=flat-square&labelColor=1a1613">
   <img alt="deployer history" src="https://img.shields.io/badge/deployer%20history-live-B7FF00?style=flat-square&labelColor=1a1613">
@@ -103,10 +103,17 @@ The Bitquery key stays in `server.js`'s own process, loaded from `.env` — it n
 which is exactly why this needs a running server and `lookup/index.html` (no key required) doesn't.
 `deployer-history.js` and the service's API both call the same tested function in
 [src/deployer-history.js](src/deployer-history.js), so they can't quietly disagree. Both accept a deployer
-or a token address — a token resolves to its deployer first — and both report an honest "inconclusive"
-rather than a false "not on Pons v2" when a lookup can't be resolved: Bitquery's realtime tier was observed
-timing out on a genuine zero-match filter, and separately on some heavy queries under load, so a timeout is
-never read as a confirmed negative (the service retries once automatically for the second case).
+or a token address — a token resolves to its deployer first.
+
+When Bitquery can't resolve an address, that alone doesn't mean the address isn't a Pons v2 launch —
+Bitquery's realtime tier was observed timing out on a genuine zero-match filter, and separately on some
+heavy queries under load. So before giving up, [src/factory-logs.js](src/factory-logs.js) asks the public
+RPC directly, in both the token and deployer argument positions. Only if that direct check also succeeds
+*and* comes back empty both ways does the answer become a confident **"not a Pons v2 launch"** — a real
+example that surfaced this exact gap (a genuine token that Bitquery kept timing out on) is in the FAQ below.
+If the direct check fails too, the honest answer stays "inconclusive" — never upgraded to a negative on
+partial information. `app/index.html` retries an inconclusive result client-side, up to 3 times, with the
+status line updated before each attempt so a slow answer looks like progress instead of a dead page.
 
 ## Why fee-recipient clusters aren't there yet
 
@@ -168,7 +175,7 @@ Known Pons v2 contracts this spec and reader are written against (Robinhood Chai
 
 ```sh
 git clone https://github.com/<you>/thread && cd thread
-npm test                                  # 33 checks, 0 dependencies, no network
+npm test                                  # 43 checks, 0 dependencies, no network
 echo "BITQUERY_API_TOKEN=..." > .env      # free token: https://account.bitquery.io/user/api_v2/access_tokens
 npm run serve                             # the real service at http://localhost:4663
 ```
@@ -183,14 +190,15 @@ needs nothing but a browser and stays that way.
 npm test
 ```
 
-Thirty-three checks, all offline, none touching a network. They cover the ERC-20/proxy decoder in
+Forty-three checks, all offline, none touching a network. They cover the ERC-20/proxy decoder in
 [src/chain-read.js](src/chain-read.js) against **frozen, real** `eth_getCode`/`eth_call` responses from
 2026-09-07; the `.env` parser in [src/env.js](src/env.js); the Bitquery query builder in
 [src/bitquery.js](src/bitquery.js), checked against the real shape of a live response; the known-infra
 check in [src/known-infra.js](src/known-infra.js), including the actual Multicall3 address from the finding
-above; and the M1 resolution logic in [src/deployer-history.js](src/deployer-history.js) — the repeat-deployer,
-Multicall3, token-resolution, and inconclusive-timeout cases, each against a stubbed `fetch` shaped like a
-real captured response, not a live call. None of it depends on a network call succeeding, so `npm test`
+above; the direct-RPC fallback in [src/factory-logs.js](src/factory-logs.js); and the M1 resolution logic in
+[src/deployer-history.js](src/deployer-history.js) — the repeat-deployer, Multicall3, token-resolution,
+confirmed-not-found, and genuinely-inconclusive cases, each against a stubbed `fetch` shaped like a real
+captured response, not a live call. None of it depends on a network call succeeding, so `npm test`
 means the same thing whether or not Robinhood Chain or Bitquery are reachable when you run it.
 `lookup/index.html` and `app/index.html` each embed their own browser copy
 of `chain-read.js`'s functions rather than importing the module — a single static file with no build step
@@ -221,6 +229,14 @@ a fake success presented as one.
 
 **What does it cost to run?** Nothing. The lookup page hits a free public RPC with no key. The tests run
 offline. `deployer-history.js` needs a Bitquery token, free at the tier this needs — see "Install."
+
+**I looked up a real token and got "inconclusive" — is that a bug?** It was, once. A real token
+("snowball capital", `0x3FBf37267A7a0f54B9062a465A997e4698925910`) surfaced exactly this: Bitquery kept
+timing out on it, and the app had no way to tell "Bitquery is having a bad day" apart from "this genuinely
+isn't on Pons v2." [src/factory-logs.js](src/factory-logs.js) fixed that by asking the public RPC directly
+whenever Bitquery can't answer — that token now resolves to a confident "not a Pons v2 launch" instead of a
+shrug. If you still see "inconclusive" today, it means *both* data sources failed to give a clean answer —
+genuinely rare, and worth just clicking Look up again.
 
 ## Built on
 

@@ -3,18 +3,33 @@
 const { isAddress } = require("./chain-read.js");
 const { buildLaunchQuery, flattenArguments, runQuery } = require("./bitquery.js");
 const { checkKnownInfra } = require("./known-infra.js");
+const { checkAddressAgainstFactory } = require("./factory-logs.js");
 
 /**
  * The shared core of M1, used by both scripts/deployer-history.js (CLI) and
  * server.js (HTTP API), so the two surfaces can never quietly disagree about
- * what counts as a resolved deployer, an infra flag, or an inconclusive
- * lookup. This function does the querying and returns structured data; it
- * prints nothing and knows nothing about a terminal or an HTTP response.
+ * what counts as a resolved deployer, an infra flag, an inconclusive lookup,
+ * or a confirmed absence. This function does the querying and returns
+ * structured data; it prints nothing and knows nothing about a terminal or
+ * an HTTP response.
  *
  * Returns one of three shapes:
  *   { status: "resolved", input, deployer, viaToken, infra, launches, hitLimit }
+ *   { status: "not-found", input, reason }
  *   { status: "inconclusive", input, reason }
  * `infra` is the known-infra record (see known-infra.js) or null.
+ *
+ * "not-found" versus "inconclusive" is the distinction that motivated
+ * src/factory-logs.js: when Bitquery can't resolve an address, that alone
+ * doesn't mean the address isn't a Pons v2 launch -- observed in practice,
+ * Bitquery's realtime tier times out on some genuine zero-match queries
+ * rather than returning `[]`. Before giving up, this function asks the
+ * public RPC directly (a check observed to be fast and clean in exactly
+ * this situation, see STATUS.md M0). Only if that direct check also
+ * succeeds AND comes back empty in both the token and deployer positions is
+ * the answer "not-found" -- an actually-checked negative. If the RPC check
+ * itself fails too, the honest answer is still "inconclusive", not a
+ * negative neither data source could confirm.
  *
  * `limit` defaults to 30, not the ceiling of 50 the query itself allows.
  * Found in practice (2026-09-07): Bitquery's realtime tier gets noticeably
@@ -90,13 +105,40 @@ async function lookupDeployerHistory(input, apiKey, { limit = 30 } = {}) {
   const reasons = [deployerResult, tokenResult]
     .filter((r) => r.status === "rejected")
     .map((r) => r.reason.message);
+  const bitqueryReason =
+    reasons.length > 0 ? reasons.join(" / ") : "no match as either a deployer or a token";
+
+  // Bitquery couldn't resolve it -- ask the public RPC directly before
+  // reporting "inconclusive". See the module doc comment for why this
+  // distinction is worth the extra call.
+  try {
+    const direct = await checkAddressAgainstFactory(input);
+    if (!direct.found) {
+      return {
+        status: "not-found",
+        input,
+        reason:
+          "Checked directly against the Pons v2 factory's TokenLaunched logs, in both the " +
+          "token and deployer positions, via eth_getLogs -- no match either way.",
+      };
+    }
+    // The direct check found *something* that Bitquery's queries missed --
+    // don't guess at what; report the original inconclusive result honestly
+    // rather than assembling a partial answer from mismatched data sources.
+  } catch (directErr) {
+    // Fall through to the original inconclusive result below; note both
+    // reasons so it's clear this wasn't just Bitquery being slow.
+    return {
+      status: "inconclusive",
+      input,
+      reason: `${bitqueryReason} (direct RPC check also failed: ${directErr.message})`,
+    };
+  }
+
   return {
     status: "inconclusive",
     input,
-    reason:
-      reasons.length > 0
-        ? reasons.join(" / ")
-        : "no match as either a deployer or a token",
+    reason: bitqueryReason,
   };
 }
 
