@@ -8,7 +8,7 @@
 
 **New wallets. Familiar connections.**
 
-Every Pons v2 launch is judged on its own. Nobody remembers that the same deployer graduated three tokens last month, or that the same address has collected creator fees across launches with different names and different Twitter accounts. thread reads the launch history a wallet leaves behind *inside Pons v2 itself*, and keeps it, so the tenth launch by a familiar address is never a cold start again.
+thread is a proposed public history of Pons v2 launches on Robinhood Chain. It will connect launches that share a deployer or a recorded fee recipient, and show the evidence behind each connection.
 
 > This repository has no working software yet. It is the specification, the ground rules, and the roadmap — written first, on purpose. See [Status](#status).
 
@@ -25,9 +25,9 @@ Two facts already sit inside the protocol's own contracts, unused as history:
 
 Neither fact requires guessing at wallet ownership across the wider chain. Both are native to Pons v2, and both compound: the tenth launch by an address thread has already seen is a fact, not an inference.
 
-## What thread does (and doesn't)
+## What thread will do
 
-**Does:**
+**Planned capabilities:**
 - builds a running history of fee-escrow recipients across every Pons v2 launch, so a repeat recipient under a new token name is visible on day one
 - builds a running history of a deployer address's launches and their graduation outcomes, read directly from `PonsV2LaunchFactory`
 - links a launch to its recorded evidence — transaction hashes, block numbers, event logs — so every claim is checkable, not asserted
@@ -63,6 +63,8 @@ Known Pons v2 contracts this spec is written against (Robinhood Chain, chain id 
 | locker | `0x267444d099b10fb5ed7c3cc7b7c767adca574952` |
 
 ## Case file format
+
+See an [illustrative case file](docs/example-case.md) for the intended output in text, or open the interactive [UI mockup](demo/index.html) to click through three fictional example launches the way a real case-file page would work. Both use invented labels and contain no live findings — see [STATUS.md](STATUS.md) milestone M-1 for what "working" means here versus what still requires a real indexer.
 
 The unit thread produces — one launch, its prior history, its evidence — is specified in [docs/case-file-format.md](docs/case-file-format.md). That format is stable even before any code reads it; it's the contract between this spec and whatever renders it later, on a page or as a shareable card.
 

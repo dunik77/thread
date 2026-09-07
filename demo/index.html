@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>thread — case files (demo)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ink:#1a1613;
+    --paper:#241f19;
+    --paper-raised:#2c261f;
+    --line:#3a3226;
+    --text:#ede3d3;
+    --text-dim:#a89a80;
+    --text-faint:#6e6252;
+    --accent:#c99a44;
+    --accent-dim:#8a6b2e;
+    --good:#5b8c74;
+    --warn:#b9683a;
+    --critical:#9c4a42;
+    --serif:'IBM Plex Serif',Georgia,'Times New Roman',serif;
+    --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    --mono:'IBM Plex Mono','SF Mono',Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:14px;
+    line-height:1.5;
+  }
+  .app{
+    max-width:1180px;
+    margin:0 auto;
+    padding:28px 24px 64px;
+  }
+
+  /* ---------- header ---------- */
+  .masthead{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:24px;
+    padding-bottom:22px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:22px;
+    position:relative;
+  }
+  .masthead h1{
+    font-family:var(--serif);
+    font-weight:700;
+    font-size:30px;
+    margin:0 0 6px;
+    letter-spacing:0.2px;
+    text-wrap:balance;
+  }
+  .masthead .tagline{
+    color:var(--text-dim);
+    font-size:14px;
+    margin:0;
+    max-width:52ch;
+  }
+  .masthead .chain-tag{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--text-faint);
+    margin-top:10px;
+    letter-spacing:0.03em;
+  }
+  .stamp{
+    font-family:var(--serif);
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--warn);
+    border:2px solid var(--warn);
+    border-radius:3px;
+    padding:8px 14px;
+    transform:rotate(4deg);
+    white-space:nowrap;
+    flex:none;
+    opacity:0.92;
+  }
+  .stamp small{
+    display:block;
+    font-family:var(--mono);
+    font-weight:400;
+    text-transform:none;
+    letter-spacing:0;
+    font-size:10px;
+    margin-top:3px;
+    color:var(--warn);
+    opacity:0.85;
+  }
+
+  /* ---------- layout ---------- */
+  .layout{
+    display:grid;
+    grid-template-columns:260px 1fr;
+    gap:24px;
+    align-items:start;
+  }
+  @media (max-width: 760px){
+    .layout{grid-template-columns:1fr;}
+  }
+
+  /* ---------- case rail ---------- */
+  .rail-label{
+    font-family:var(--mono);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    color:var(--text-faint);
+    margin:0 0 10px 2px;
+  }
+  .case-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .case-item{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-left:3px solid transparent;
+    border-radius:4px;
+    padding:11px 13px;
+    cursor:pointer;
+    color:var(--text);
+    font-family:var(--sans);
+  }
+  .case-item:hover{background:var(--paper-raised);}
+  .case-item.active{
+    border-left-color:var(--accent);
+    background:var(--paper-raised);
+  }
+  .case-item .ticker{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:15px;
+    display:block;
+    margin-bottom:5px;
+  }
+  .case-item .meta{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .case-item .finding{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--text-dim);
+  }
+
+  /* ---------- pills ---------- */
+  .pill{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.03em;
+    padding:2px 8px;
+    border-radius:99px;
+    border:1px solid currentColor;
+    line-height:1.6;
+  }
+  .pill.graduated{color:var(--good);}
+  .pill.curve{color:var(--accent);}
+  .pill.dead{color:var(--critical);}
+
+  .legend{
+    display:flex;
+    gap:14px;
+    margin:12px 2px 20px;
+    flex-wrap:wrap;
+  }
+  .legend span{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--text-faint);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .legend i{
+    width:8px;height:8px;border-radius:50%;display:inline-block;
+  }
+  .legend i.graduated{background:var(--good);}
+  .legend i.curve{background:var(--accent);}
+  .legend i.dead{background:var(--critical);}
+
+  /* ---------- dossier ---------- */
+  .dossier{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:26px 28px 22px;
+  }
+  .dossier-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    padding-bottom:18px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:20px;
+    flex-wrap:wrap;
+  }
+  .dossier-head h2{
+    font-family:var(--serif);
+    font-size:24px;
+    margin:0 0 8px;
+  }
+  .addr-row{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--text-dim);
+    display:flex;
+    gap:8px;
+    align-items:baseline;
+    flex-wrap:wrap;
+  }
+  .addr-row .label{
+    color:var(--text-faint);
+    font-family:var(--sans);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+  }
+
+  section.block{margin-bottom:24px;}
+  section.block:last-of-type{margin-bottom:0;}
+  .block h3{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.09em;
+    color:var(--text-dim);
+    margin:0 0 12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .block h3 .count{
+    font-family:var(--mono);
+    font-weight:400;
+    color:var(--text-faint);
+    text-transform:none;
+    letter-spacing:0;
+  }
+
+  .row{
+    display:grid;
+    grid-template-columns:1fr auto auto;
+    gap:14px;
+    align-items:center;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    background:var(--ink);
+    margin-bottom:6px;
+  }
+  .row:last-child{margin-bottom:0;}
+  .row .primary{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--text);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .row .amount{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--text-dim);
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+  .row .via{
+    font-size:11px;
+    color:var(--text-faint);
+    font-family:var(--sans);
+  }
+
+  .tx-btn{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--accent);
+    background:none;
+    border:1px solid var(--accent-dim);
+    border-radius:3px;
+    padding:4px 8px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .tx-btn:hover{background:rgba(201,154,68,0.1);}
+  .tx-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .empty-note{
+    font-family:var(--sans);
+    font-size:12.5px;
+    color:var(--text-faint);
+    font-style:italic;
+    padding:10px 12px;
+  }
+
+  .gap-row{
+    display:flex;
+    gap:10px;
+    padding:10px 12px;
+    border:1px solid var(--warn);
+    border-left-width:3px;
+    border-radius:4px;
+    background:rgba(185,104,58,0.08);
+    margin-bottom:6px;
+    font-size:12.5px;
+    color:var(--text);
+  }
+  .gap-row:last-child{margin-bottom:0;}
+  .gap-row .mark{color:var(--warn);font-family:var(--mono);flex:none;}
+
+  .dossier-foot{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:22px;
+    padding-top:16px;
+    border-top:1px solid var(--line);
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--text-faint);
+  }
+  .dossier-foot a{color:var(--accent-dim);}
+
+  .toast{
+    position:fixed;
+    bottom:22px;
+    left:50%;
+    transform:translateX(-50%) translateY(12px);
+    background:var(--paper-raised);
+    border:1px solid var(--accent-dim);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:12.5px;
+    padding:9px 16px;
+    border-radius:5px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.18s ease, transform 0.18s ease;
+    z-index:10;
+  }
+  .toast.show{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .toast{transition:none;}
+  }
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="masthead">
+    <div>
+      <h1>thread — case files</h1>
+      <p class="tagline">New wallets. Familiar connections. What a Pons v2 launch's own deployer and fee-escrow history says about it — evidence only, nothing implied beyond it.</p>
+      <p class="chain-tag">robinhood chain · id 4663 · pons v2</p>
+    </div>
+    <div class="stamp">Demo data<small>not a live chain read</small></div>
+  </header>
+
+  <div class="legend">
+    <span><i class="graduated"></i>graduated</span>
+    <span><i class="curve"></i>on curve</span>
+    <span><i class="dead"></i>dead</span>
+  </div>
+
+  <div class="layout">
+    <nav>
+      <p class="rail-label">Example launches</p>
+      <div class="case-list" id="caseList"></div>
+    </nav>
+    <main class="dossier" id="dossier"></main>
+  </div>
+</div>
+
+<div class="toast" id="toast">Demo data — this is not a real transaction.</div>
+
+<script>
+const CASES = [
+  {
+    ticker: "$GLOWFROG",
+    launch_address: "0xA17F9E2C4B8D1F6A3E9C7B2D5F8A1E4C6B9D3F70",
+    deployer_address: "0xD3F81C4E9B2A7F5D8E1C4B9A6F3D7E2C5B8A1F94",
+    phase: "graduated",
+    deployer_prior_launches: [
+      { ticker: "$MOSSKING", phase: "dead", tx_hash: "0x6a1fd83bce...c92d" },
+      { ticker: "$EMBERPUP", phase: "graduated", tx_hash: "0x2b7ea914f0...44f1" }
+    ],
+    fee_recipients: [
+      { address: "0x7C4A9F2E1D8B5C3A6F9E2D7C4B1A8F5E3D6C9B2A", amount: "4.80 ETH", tx_hash: "0x9d3c7ab421...81ab" }
+    ],
+    fee_recipients_elsewhere: [
+      { address: "0x7C4A9F2E1D8B5C3A6F9E2D7C4B1A8F5E3D6C9B2A", launch: "$MOSSKING", tx_hash: "0x5e11d0af92...2c9e" },
+      { address: "0x7C4A9F2E1D8B5C3A6F9E2D7C4B1A8F5E3D6C9B2A", launch: "$EMBERPUP", tx_hash: "0x8f3a29bc51...77d4" }
+    ],
+    evidence_gaps: [],
+    generated_at: "2026-09-07 18:42 UTC · block 1,402,118"
+  },
+  {
+    ticker: "$KELPKING",
+    launch_address: "0xE28B4D1A9C6F3E7B2D5A8C1F4E9B6D3A7C2F5E81",
+    deployer_address: "0xF1C8A4D7B2E9C6F3A8D1B5E2C9F6A3D7B4E1C8A5",
+    phase: "curve",
+    deployer_prior_launches: [],
+    fee_recipients: [
+      { address: "0x3D9A6C2F8E5B1D4A7C9F2E6B3D8A5C1F4E7B2D9A", amount: "0.62 ETH", tx_hash: "0x4f2a80c913...9c3d" }
+    ],
+    fee_recipients_elsewhere: [],
+    evidence_gaps: [],
+    generated_at: "2026-09-07 18:44 UTC · block 1,402,151"
+  },
+  {
+    ticker: "$ASHVAULT",
+    launch_address: "0xB94D2A7C1E8F5B3A9D6C2F4E7B1A8D5C3F9E6B2A",
+    deployer_address: "0xA5D8C1F4E9B6A3D7C2F5E8B1A4D9C6F3E7B2A5D8",
+    phase: "dead",
+    deployer_prior_launches: [
+      { ticker: "$VOIDCASK", phase: "graduated", tx_hash: "0x81ecb03f74...5a3f" }
+    ],
+    fee_recipients: [],
+    fee_recipients_elsewhere: [],
+    evidence_gaps: [
+      "Fee escrow for this launch returned no events before the indexed block cutoff — recipient list may be incomplete, not empty.",
+      "Deployer history checked back to block 1,180,000 only. Earlier activity by this address is not indexed."
+    ],
+    generated_at: "2026-09-07 18:46 UTC · block 1,402,177"
+  }
+];
+
+let active = 0;
+
+function short(addr){
+  return addr.slice(0,8) + "…" + addr.slice(-6);
+}
+
+function findingLabel(c){
+  const parts = [];
+  if(c.deployer_prior_launches.length) parts.push(c.deployer_prior_launches.length + " prior launch" + (c.deployer_prior_launches.length>1?"es":""));
+  if(c.fee_recipients_elsewhere.length) parts.push(c.fee_recipients_elsewhere.length + " fee overlap" + (c.fee_recipients_elsewhere.length>1?"s":""));
+  if(c.evidence_gaps.length) parts.push(c.evidence_gaps.length + " gap" + (c.evidence_gaps.length>1?"s":""));
+  return parts.length ? parts.join(" · ") : "no prior connections found";
+}
+
+function renderList(){
+  const list = document.getElementById('caseList');
+  list.innerHTML = CASES.map((c,i) => `
+    <button class="case-item ${i===active?'active':''}" data-i="${i}">
+      <span class="ticker">${c.ticker}</span>
+      <span class="meta">
+        <span class="pill ${c.phase}">${c.phase}</span>
+        <span class="finding">${findingLabel(c)}</span>
+      </span>
+    </button>
+  `).join('');
+  list.querySelectorAll('.case-item').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ active = Number(btn.dataset.i); render(); });
+  });
+}
+
+function txButton(hash){
+  return `<button class="tx-btn" onclick="showToast()">${hash} ↗</button>`;
+}
+
+function renderDossier(){
+  const c = CASES[active];
+  const d = document.getElementById('dossier');
+  d.innerHTML = `
+    <div class="dossier-head">
+      <div>
+        <h2>${c.ticker}</h2>
+        <div class="addr-row"><span class="label">launch</span> ${c.launch_address}</div>
+        <div class="addr-row"><span class="label">deployer</span> ${c.deployer_address}</div>
+      </div>
+      <span class="pill ${c.phase}">${c.phase}</span>
+    </div>
+
+    <section class="block">
+      <h3>Deployer history <span class="count">(${c.deployer_prior_launches.length})</span></h3>
+      ${c.deployer_prior_launches.length ? c.deployer_prior_launches.map(l => `
+        <div class="row">
+          <span class="primary">${l.ticker}</span>
+          <span class="pill ${l.phase}">${l.phase}</span>
+          ${txButton(l.tx_hash)}
+        </div>
+      `).join('') : `<p class="empty-note">No earlier launches found for this deployer address in the indexed range.</p>`}
+    </section>
+
+    <section class="block">
+      <h3>Fee-escrow recipients <span class="count">(${c.fee_recipients.length})</span></h3>
+      ${c.fee_recipients.length ? c.fee_recipients.map(f => `
+        <div class="row">
+          <span class="primary">${short(f.address)}</span>
+          <span class="amount">${f.amount}</span>
+          ${txButton(f.tx_hash)}
+        </div>
+      `).join('') : `<p class="empty-note">No credited fee recipients recorded for this launch.</p>`}
+    </section>
+
+    <section class="block">
+      <h3>Same recipient, other launches <span class="count">(${c.fee_recipients_elsewhere.length})</span></h3>
+      ${c.fee_recipients_elsewhere.length ? c.fee_recipients_elsewhere.map(f => `
+        <div class="row">
+          <span class="primary">${short(f.address)}</span>
+          <span class="via">also paid on ${f.launch}</span>
+          ${txButton(f.tx_hash)}
+        </div>
+      `).join('') : `<p class="empty-note">No other launch has credited the same fee recipient.</p>`}
+    </section>
+
+    <section class="block">
+      <h3>Evidence gaps <span class="count">(${c.evidence_gaps.length})</span></h3>
+      ${c.evidence_gaps.length ? c.evidence_gaps.map(g => `
+        <div class="gap-row"><span class="mark">△</span><span>${g}</span></div>
+      `).join('') : `<p class="empty-note">Nothing known to be missing for this case file.</p>`}
+    </section>
+
+    <div class="dossier-foot">
+      <span>generated ${c.generated_at}</span>
+      <span>format v0 · see <a href="../docs/case-file-format.md">docs/case-file-format.md</a></span>
+    </div>
+  `;
+}
+
+function render(){ renderList(); renderDossier(); }
+
+function showToast(){
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+render();
+</script>
+
+</body>
+</html>
