@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <img alt="tests" src="https://img.shields.io/badge/tests-43%20passing-B7FF00?style=flat-square&labelColor=1a1613">
+  <img alt="tests" src="https://img.shields.io/badge/tests-44%20passing-B7FF00?style=flat-square&labelColor=1a1613">
   <img alt="runtime deps" src="https://img.shields.io/badge/runtime%20deps-0-B7FF00?style=flat-square&labelColor=1a1613">
   <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A518-c99a44?style=flat-square&labelColor=1a1613">
   <img alt="deployer history" src="https://img.shields.io/badge/deployer%20history-live-B7FF00?style=flat-square&labelColor=1a1613">
@@ -175,7 +175,7 @@ Known Pons v2 contracts this spec and reader are written against (Robinhood Chai
 
 ```sh
 git clone https://github.com/<you>/thread && cd thread
-npm test                                  # 43 checks, 0 dependencies, no network
+npm test                                  # 44 checks, 0 dependencies, no network
 echo "BITQUERY_API_TOKEN=..." > .env      # free token: https://account.bitquery.io/user/api_v2/access_tokens
 npm run serve                             # the real service at http://localhost:4663
 ```
@@ -190,7 +190,7 @@ needs nothing but a browser and stays that way.
 npm test
 ```
 
-Forty-three checks, all offline, none touching a network. They cover the ERC-20/proxy decoder in
+Forty-four checks, all offline, none touching a network. They cover the ERC-20/proxy decoder in
 [src/chain-read.js](src/chain-read.js) against **frozen, real** `eth_getCode`/`eth_call` responses from
 2026-09-07; the `.env` parser in [src/env.js](src/env.js); the Bitquery query builder in
 [src/bitquery.js](src/bitquery.js), checked against the real shape of a live response; the known-infra
@@ -237,6 +237,20 @@ isn't on Pons v2." [src/factory-logs.js](src/factory-logs.js) fixed that by aski
 whenever Bitquery can't answer — that token now resolves to a confident "not a Pons v2 launch" instead of a
 shrug. If you still see "inconclusive" today, it means *both* data sources failed to give a clean answer —
 genuinely rare, and worth just clicking Look up again.
+
+**I looked up a real token and got a raw "context deadline exceeded" error — is that a bug?** Also fixed,
+same day. A real, graduated launch ("Pushin'", `0xE1E5f00A9B0255ca4dF85B3130eE0F77d15acC2D`) resolved its
+deployer correctly, then the separate follow-up query for that deployer's *other* launches timed out — and
+an unwrapped `await` turned that into a crash instead of a partial answer. It now returns the confirmed
+deployer address with a clear note that the rest of the history couldn't be fetched this time, instead of
+throwing away a fact it already had. See STATUS.md M1.7.
+
+**Where do I find every token launched on Pons v2, not just one I already have an address for?**
+Not here — thread answers questions about a specific address you already have, and deliberately doesn't
+build a general "browse all launches" feed (see SPEC.md's scope). For that, the launchpad's own explore
+page is the source: [ponsfamily.com/launchpad](https://www.ponsfamily.com/launchpad). Every address in this
+README's examples (the repeat deployer, Multicall3, and "Pushin'") is a real one found live via Bitquery
+while building this, not a curated list — a starting point if you want something to paste in and try.
 
 ## Built on
 

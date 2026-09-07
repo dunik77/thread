@@ -71,6 +71,10 @@ async function main() {
     console.log(`   share a batching contract. See SPEC.md "Open questions" for how this was confirmed.\n`);
   }
 
+  if (result.partial) {
+    console.log(`⚠  ${result.partialReason}\n`);
+  }
+
   console.log(`Deployer:  ${result.deployer}`);
   console.log(`Launches found: ${result.launches.length}${result.hitLimit ? " (hit the query limit -- there may be more)" : ""}\n`);
 

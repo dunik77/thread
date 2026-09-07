@@ -381,7 +381,11 @@ function render(addr, card, history){
     if (history.infra){
       html += `<div class="infra-warning" style="margin-top:12px;"><span class="mark">⚠</span><div><b>${history.infra.name}</b> -- not a person. ${history.infra.reason}</div></div>`;
     }
-    html += `<div class="field"><div class="k">Launches found</div><div class="v">${history.launches.length}${history.hitLimit ? ' (hit query limit -- more may exist)' : ''}</div></div>`;
+    if (history.partial){
+      html += `<div class="infra-warning" style="margin-top:12px;border-color:var(--warn);"><span class="mark">⚠</span><div>${history.partialReason}</div></div>`;
+    } else {
+      html += `<div class="field"><div class="k">Launches found</div><div class="v">${history.launches.length}${history.hitLimit ? ' (hit query limit -- more may exist)' : ''}</div></div>`;
+    }
     if (history.launches.length > 0){
       html += '<div class="launch-list" style="margin-top:10px;">';
       for (const l of history.launches){

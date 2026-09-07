@@ -14,10 +14,15 @@ const { checkAddressAgainstFactory } = require("./factory-logs.js");
  * an HTTP response.
  *
  * Returns one of three shapes:
- *   { status: "resolved", input, deployer, viaToken, infra, launches, hitLimit }
+ *   { status: "resolved", input, deployer, viaToken, infra, launches, hitLimit, partial?, partialReason? }
  *   { status: "not-found", input, reason }
  *   { status: "inconclusive", input, reason }
- * `infra` is the known-infra record (see known-infra.js) or null.
+ * `infra` is the known-infra record (see known-infra.js) or null. `partial`
+ * (true) and `partialReason` only appear on a "resolved" result reached via
+ * `viaToken` whose follow-up deployer-history query failed after the
+ * deployer was already confirmed -- `launches` is `[]` in that case, not a
+ * true empty result, so it's flagged rather than presented as "this
+ * deployer has zero other launches."
  *
  * "not-found" versus "inconclusive" is the distinction that motivated
  * src/factory-logs.js: when Bitquery can't resolve an address, that alone
@@ -83,23 +88,46 @@ async function lookupDeployerHistory(input, apiKey, { limit = 30 } = {}) {
 
   if (tokenResult.status === "fulfilled" && tokenResult.value) {
     const deployer = tokenResult.value;
-    const { query } = buildLaunchQuery("deployer", deployer, { limit });
-    const launches = await runQuery(query, apiKey);
-    return {
-      status: "resolved",
-      input,
-      deployer,
-      viaToken: true,
-      infra: checkKnownInfra(deployer),
-      launches: launches.map(flattenArguments).map((args, i) => ({
-        token: args.token,
-        curve: args.curve,
-        pairToken: args.pairToken,
-        block: launches[i].Block,
-        txHash: launches[i].Transaction.Hash,
-      })),
-      hitLimit: launches.length === limit,
-    };
+    // This confirms `input` IS a real Pons v2 token -- the token-argument
+    // query only succeeds on a real match. Everything from here is a
+    // follow-up enrichment query (the deployer's *other* launches), and it
+    // can fail independently of that confirmed fact. Found the hard way,
+    // 2026-09-07: a real token ("Pushin'") resolved its deployer correctly
+    // and then this second query timed out, and an unwrapped await here
+    // turned a partial success into a total failure -- the whole lookup
+    // threw instead of at least reporting the deployer that was already
+    // known. Never throw away a confirmed fact because the next query failed.
+    try {
+      const { query } = buildLaunchQuery("deployer", deployer, { limit });
+      const launches = await runQuery(query, apiKey);
+      return {
+        status: "resolved",
+        input,
+        deployer,
+        viaToken: true,
+        infra: checkKnownInfra(deployer),
+        launches: launches.map(flattenArguments).map((args, i) => ({
+          token: args.token,
+          curve: args.curve,
+          pairToken: args.pairToken,
+          block: launches[i].Block,
+          txHash: launches[i].Transaction.Hash,
+        })),
+        hitLimit: launches.length === limit,
+      };
+    } catch (followUpErr) {
+      return {
+        status: "resolved",
+        input,
+        deployer,
+        viaToken: true,
+        infra: checkKnownInfra(deployer),
+        launches: [],
+        hitLimit: false,
+        partial: true,
+        partialReason: `Confirmed this is a Pons v2 launch and found its deployer, but the follow-up query for the deployer's other launches failed: ${followUpErr.message}. Look up again to retry just that part.`,
+      };
+    }
   }
 
   const reasons = [deployerResult, tokenResult]

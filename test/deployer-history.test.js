@@ -128,6 +128,35 @@ test("lookupDeployerHistory resolves a token address via its deployer", async ()
   }
 });
 
+test("lookupDeployerHistory still reports a confirmed deployer when the follow-up launch-list query fails", async () => {
+  // The real bug, 2026-09-07: a real token ("Pushin'") resolved its deployer
+  // fine via the token-argument query, then the follow-up query for that
+  // deployer's other launches timed out -- and an unwrapped await turned
+  // that into a thrown exception instead of a partial, still-useful result.
+  const restore = stubFetch({
+    bitquery: (query) => {
+      if (query.includes('Name: {is: "token"}')) {
+        return { data: { EVM: { Events: [launchedEvent(REAL_TOKEN, REAL_DEPLOYER, "0xtx1", "2026-09-05T00:00:00Z")] } } };
+      }
+      if (query.includes('Name: {is: "deployer"}') && query.includes(REAL_DEPLOYER)) {
+        return { errors: [{ message: "context deadline exceeded (Client.Timeout or context cancellation while reading body)" }] };
+      }
+      return { data: { EVM: { Events: [] } } };
+    },
+  });
+  try {
+    const result = await lookupDeployerHistory(REAL_TOKEN, "fake-key");
+    assert.equal(result.status, "resolved");
+    assert.equal(result.viaToken, true);
+    assert.equal(result.deployer, REAL_DEPLOYER);
+    assert.equal(result.partial, true);
+    assert.match(result.partialReason, /follow-up query/);
+    assert.deepEqual(result.launches, []);
+  } finally {
+    restore();
+  }
+});
+
 test("lookupDeployerHistory reports not-found when Bitquery is inconclusive but the RPC confirms zero matches", async () => {
   const restore = stubFetch({
     bitquery: () => ({
