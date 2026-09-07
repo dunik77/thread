@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>thread avatar</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:512px;height:512px;overflow:hidden;}
+  body{background:#14110e;position:relative;}
+  .grid{
+    position:absolute; inset:0;
+    background-image:radial-gradient(circle, #241f19 2px, transparent 2px);
+    background-size:32px 32px;
+    opacity:0.6;
+  }
+  .glow{
+    position:absolute; left:50%; top:52%;
+    width:460px; height:460px; transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(201,154,68,0.16) 0%, rgba(201,154,68,0.05) 45%, transparent 70%);
+  }
+  svg{position:absolute; inset:0;}
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="glow"></div>
+  <!--
+    Same glyph as the banner, compressed to survive 40px: a thread walks
+    three addresses, then comes back to the one it already visited. Heavy
+    strokes and only four shapes, so it still reads when GitHub scales it
+    down to a tiny avatar.
+  -->
+  <svg viewBox="0 0 512 512" fill="none">
+    <!-- outbound thread through the dim nodes -->
+    <path d="M 74 176 L 176 176 L 250 116 L 366 116 L 438 214"
+          stroke="#5a4d3d" stroke-width="15" stroke-linecap="square" stroke-linejoin="round"/>
+    <!-- the return: curls back down and left, to the node it started from -->
+    <path d="M 438 214 C 452 352, 330 424, 232 404 C 150 388, 108 300, 122 210"
+          stroke="#c99a44" stroke-width="17" stroke-linecap="square" stroke-linejoin="round"/>
+
+    <!-- dim addresses -->
+    <g fill="#5a4d3d">
+      <rect x="228" y="94" width="44" height="44"/>
+      <rect x="344" y="94" width="44" height="44"/>
+      <rect x="416" y="192" width="44" height="44"/>
+    </g>
+
+    <!-- the address seen twice: bright, ringed, sitting where the loop closes -->
+    <rect x="86" y="174" width="72" height="72" fill="#f0c163"/>
+    <rect x="66" y="154" width="112" height="112" fill="none" stroke="#c99a44" stroke-width="8" opacity="0.55"/>
+  </svg>
+</body>
+</html>
