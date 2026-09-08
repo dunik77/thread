@@ -216,7 +216,7 @@
   .warnbox b{color:var(--amber);}
 
   .launches{max-height:420px;overflow-y:auto;}
-  .launch{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;padding:11px 20px;border-bottom:1px solid var(--line-soft);font-size:13px;}
+  .launch{display:grid;grid-template-columns:minmax(170px,1fr) minmax(90px,auto) auto auto auto auto;gap:10px;align-items:center;padding:11px 20px;border-bottom:1px solid var(--line-soft);font-size:13px;}
   .launch:last-child{border-bottom:none;}
   .launch .t{font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .launch .t b{color:var(--amber);font-weight:600;}
@@ -225,6 +225,12 @@
   .token-address:hover{color:var(--cyan);text-decoration-color:var(--cyan);}
   .token-address:focus-visible{outline:1px solid var(--cyan);outline-offset:3px;border-radius:2px;}
   .launch .when{font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap;}
+  .launch-cap{font-family:var(--mono);font-size:11px;color:var(--text);white-space:nowrap;text-align:right;}
+  .launch-cap.loading{color:var(--faint);}
+  .migration{font-family:var(--mono);font-size:9.5px;line-height:1;letter-spacing:.07em;text-transform:uppercase;border:1px solid var(--line);border-radius:99px;padding:5px 8px;white-space:nowrap;}
+  .migration.bonding{color:var(--cyan);border-color:rgba(96,246,210,.34);background:rgba(96,246,210,.05);}
+  .migration.migrated{color:var(--violet);border-color:rgba(181,144,255,.4);background:rgba(181,144,255,.07);}
+  .migration.unknown{color:var(--faint);}
   .launch a{font-family:var(--mono);font-size:11px;color:var(--green);text-decoration:none;border:1px solid var(--line);border-radius:3px;padding:3px 8px;white-space:nowrap;}
   .launch a:hover{border-color:var(--green);}
   .launch-copy{font-family:var(--mono);font-size:11px;color:var(--dim);background:transparent;border:1px solid var(--line);border-radius:3px;padding:3px 8px;cursor:pointer;white-space:nowrap;transition:border-color .18s,color .18s,background .18s;}
@@ -259,7 +265,7 @@
     .lede{font-size:16px;max-width:100%}
     .hero-visual{min-height:280px}.signal-card{width:250px;border-radius:20px}.orbit{width:290px;height:290px}.signal-tag.one{left:-8px}.signal-tag.two{right:-8px}
     .live div{flex-basis:50%;border-bottom:1px solid var(--line)}.lookup button{min-height:48px;flex:1 1 100%}#try .wrap{margin-inline:10px;padding:28px 20px}
-    .res .kv{grid-template-columns:1fr;gap:4px}.launch{grid-template-columns:minmax(0,1fr) auto auto}.launch .when{display:none}table{display:block;overflow-x:auto}footer .cols p:last-child{text-align:left!important}
+    .res .kv{grid-template-columns:1fr;gap:4px}.launch{grid-template-columns:minmax(0,1fr) auto auto;gap:8px}.launch .when{display:none}.launch-cap{grid-column:1;text-align:left}.migration{grid-column:2}.launch-copy{grid-column:2;grid-row:1}.launch>a{grid-column:3;grid-row:1}table{display:block;overflow-x:auto}footer .cols p:last-child{text-align:left!important}
   }
   @media (prefers-reduced-motion:reduce){.orbit,.signal-card::before,.eyebrow::before{animation:none}.btn,.grid .cell{transition:none}}
 </style>
@@ -381,16 +387,6 @@
       chain. Launches routed through it record the batcher as <code>msg.sender</code>, so eight unrelated
       people collapse into one apparent deployer.
     </p>
-    <div class="callout">
-      <p>
-        Shipped naively, that would have been thread's own first output, and it would have been false. So
-        every deployer is checked against a list of known shared infrastructure before anything is shown,
-        and each entry on that list carries the evidence that put it there.
-      </p>
-      <p>
-        You do not have to take that on faith. No API key, about a second:
-      </p>
-    </div>
     <pre><span class="c">$</span> python3 analysis/verify_infra.py 0xca11bde05977b3631167028862be2a173976ca11
 
   3808 bytes of deployed code — a genuine contract
@@ -623,6 +619,8 @@ loadLive();
 const FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const TOKEN_LAUNCHED = "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607";
 const EXPLORER = "https://robinhoodchain.blockscout.com";
+const DEXSCREENER_CHAIN = "robinhood";
+const DEXSCREENER_API = "https://api.dexscreener.com/tokens/v1";
 
 // contracts that can occupy a deployer slot without being anyone -- see
 // src/known-infra.js, and section 02 above for how this one was confirmed
@@ -736,6 +734,25 @@ async function readToken(address) {
   return out;
 }
 
+/** The smaller token read used for history rows: token units cancel in FDV math. */
+async function readLaunchToken(address) {
+  const calls = await Promise.allSettled([
+    rpc("eth_call", [{ to: address, data: "0x06fdde03" }, "latest"]),
+    rpc("eth_call", [{ to: address, data: "0x95d89b41" }, "latest"]),
+    rpc("eth_call", [{ to: address, data: "0x18160ddd" }, "latest"]),
+  ]);
+  const val = (i) => (calls[i].status === "fulfilled" ? calls[i].value : null);
+  let supplyRaw = null;
+  try {
+    if (val(2) && val(2) !== "0x") supplyRaw = BigInt(val(2));
+  } catch {}
+  return {
+    name: val(0) && decodeString(val(0)),
+    symbol: val(1) && decodeString(val(1)),
+    supplyRaw,
+  };
+}
+
 /** Fill in real block timestamps, capped so a long history doesn't hammer the RPC. */
 async function attachTimes(launches) {
   const blocks = [...new Set(launches.map((l) => l.blockHex))].slice(0, 40);
@@ -767,6 +784,85 @@ async function nameLaunches(launches) {
       l.symbol = meta.symbol;
     }
   }));
+}
+
+/**
+ * Add live token metadata, curve value, and migration state to every launch.
+ * Kept deliberately low-concurrency because one deployer can have hundreds
+ * of launches and the page talks to a shared public RPC with no API key.
+ */
+async function enrichLaunches(launches, onUpdate) {
+  const queue = launches.filter((l) => l.detailsState !== "ready");
+  const total = queue.length;
+  let completed = 0;
+
+  await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
+    while (queue.length) {
+      const launch = queue.shift();
+      const meta = await readLaunchToken(launch.token);
+      launch.name = meta.name;
+      launch.symbol = meta.symbol;
+      launch.value = await readCurveValue(launch, meta.supplyRaw);
+      launch.detailsState = launch.value ? "ready" : "unavailable";
+      completed += 1;
+      if (onUpdate) onUpdate(launch, completed, total);
+    }
+  }));
+}
+
+/**
+ * Dexscreener is the post-migration price source. Its token endpoint accepts
+ * up to 30 addresses per request, so even a 300-launch history costs only ten
+ * requests. If several pools exist, the deepest USD-liquidity pool wins.
+ */
+async function attachDexMarkets(launches, onUpdate) {
+  const byToken = new Map(launches.map((l) => [l.token.toLowerCase(), l]));
+  const addresses = [...byToken.keys()];
+  const batches = [];
+  for (let i = 0; i < addresses.length; i += 30) batches.push(addresses.slice(i, i + 30));
+  const queue = [...batches];
+
+  await Promise.all(Array.from({ length: Math.min(3, queue.length) }, async () => {
+    while (queue.length) {
+      const batch = queue.shift();
+      try {
+        const url = `${DEXSCREENER_API}/${DEXSCREENER_CHAIN}/${batch.join(",")}`;
+        const response = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!response.ok) continue;
+        const pairs = await response.json();
+        if (!Array.isArray(pairs)) continue;
+
+        for (const pair of pairs) {
+          const token = pair?.baseToken?.address?.toLowerCase();
+          const launch = token && byToken.get(token);
+          if (!launch) continue;
+
+          const marketCap = pair.marketCap == null ? NaN : Number(pair.marketCap);
+          const fdv = pair.fdv == null ? NaN : Number(pair.fdv);
+          const candidate = {
+            marketCap: Number.isFinite(marketCap) && marketCap >= 0 ? marketCap : null,
+            fdv: Number.isFinite(fdv) && fdv >= 0 ? fdv : null,
+            liquidityUsd: Number(pair?.liquidity?.usd) || 0,
+            url: typeof pair.url === "string" && pair.url.startsWith("https://dexscreener.com/") ? pair.url : null,
+          };
+          if (candidate.marketCap == null && candidate.fdv == null) continue;
+
+          if (!launch.dexMarket || candidate.liquidityUsd > launch.dexMarket.liquidityUsd) {
+            launch.dexMarket = candidate;
+            if (onUpdate) onUpdate(launch);
+          }
+        }
+      } catch {
+        // Dexscreener is a secondary source. Its failure must not discard the
+        // launch or change an on-chain migration result into a false negative.
+      }
+    }
+  }));
+
+  for (const launch of launches) {
+    launch.dexChecked = true;
+    if (onUpdate) onUpdate(launch);
+  }
 }
 
 function parseLog(log) {
@@ -823,6 +919,7 @@ function parseLog(log) {
  */
 const USD_STABLES = new Set(["USDG", "USDC", "USDT", "DAI"]);
 let ethUsdCache = null;
+const pairMetaCache = new Map();
 
 async function ethUsd() {
   if (ethUsdCache !== null) return ethUsdCache;
@@ -847,6 +944,23 @@ async function toUsd(amount, symbol, isNative) {
   return null;
 }
 
+async function readPairMeta(address) {
+  const key = address.toLowerCase();
+  if (!pairMetaCache.has(key)) {
+    pairMetaCache.set(key, (async () => {
+      const [s, d] = await Promise.allSettled([
+        rpc("eth_call", [{ to: address, data: "0x95d89b41" }, "latest"]),
+        rpc("eth_call", [{ to: address, data: "0x313ce567" }, "latest"]),
+      ]);
+      return {
+        symbol: s.status === "fulfilled" ? decodeString(s.value) || "?" : "?",
+        decimals: d.status === "fulfilled" && d.value ? parseInt(d.value, 16) : 18,
+      };
+    })());
+  }
+  return pairMetaCache.get(key);
+}
+
 async function readCurveValue(launch, supplyRaw) {
   if (!launch || !launch.curve || supplyRaw == null) return null;
   try {
@@ -862,12 +976,9 @@ async function readCurveValue(launch, supplyRaw) {
     const isNative = !launch.pairToken || /^0x0+$/.test(launch.pairToken);
     let symbol = "ETH", decimals = 18;
     if (!isNative) {
-      const [s, d] = await Promise.allSettled([
-        rpc("eth_call", [{ to: launch.pairToken, data: "0x95d89b41" }, "latest"]),
-        rpc("eth_call", [{ to: launch.pairToken, data: "0x313ce567" }, "latest"]),
-      ]);
-      if (s.status === "fulfilled") symbol = decodeString(s.value) || "?";
-      if (d.status === "fulfilled" && d.value) decimals = parseInt(d.value, 16);
+      const pair = await readPairMeta(launch.pairToken);
+      symbol = pair.symbol;
+      decimals = pair.decimals;
     }
 
     // fdv = supply * (quote / token), with the token units cancelling
@@ -890,6 +1001,68 @@ async function readCurveValue(launch, supplyRaw) {
 
 function copyBtn(value) {
   return `<button class="mini" data-copy="${esc(value)}">copy</button>`;
+}
+
+function compactNumber(value) {
+  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 2 }).format(value);
+}
+
+function launchValueView(launch) {
+  const dexAmount = launch.dexMarket && (launch.dexMarket.marketCap ?? launch.dexMarket.fdv);
+  const dexLabel = launch.dexMarket && launch.dexMarket.marketCap != null ? "MKT " : "FDV ";
+
+  if (launch.detailsState === "unavailable") {
+    return dexAmount != null
+      ? { cap: dexLabel + "$" + compactNumber(dexAmount), capClass: "", state: "unknown", stateClass: "unknown", source: "Dexscreener" }
+      : { cap: "cap unknown", capClass: "loading", state: "unknown", stateClass: "unknown" };
+  }
+  if (!launch.value) {
+    return dexAmount != null
+      ? { cap: dexLabel + "$" + compactNumber(dexAmount), capClass: "", state: "checking…", stateClass: "unknown", source: "Dexscreener" }
+      : { cap: "reading…", capClass: "loading", state: "checking…", stateClass: "unknown" };
+  }
+  if (launch.value.graduated) {
+    return dexAmount != null
+      ? { cap: dexLabel + "$" + compactNumber(dexAmount), capClass: "", state: "migrated", stateClass: "migrated", source: "Dexscreener" }
+      : { cap: launch.dexChecked ? "not on DEX" : "DEX pending…", capClass: "loading", state: "migrated", stateClass: "migrated" };
+  }
+
+  const cap = launch.value.usd
+    ? "$" + compactNumber(launch.value.usd.value)
+    : compactNumber(launch.value.fdv) + " " + (launch.value.symbol || "?");
+  return { cap: "FDV " + cap, capClass: "", state: "bonding", stateClass: "bonding", source: "live bonding curve" };
+}
+
+function updateLaunchRow(launch) {
+  const row = document.getElementById("launch-" + launch.token.slice(2).toLowerCase());
+  if (!row) return;
+
+  const label = row.querySelector(".launch-label");
+  const address = `<button class="token-address" data-copy="${esc(launch.token)}" title="Copy full token contract" aria-label="Copy token contract ${esc(launch.token)}">${short(launch.token)}</button>`;
+  label.innerHTML = launch.symbol ? `<b>$${esc(launch.symbol)}</b> ${address}` : address;
+
+  const view = launchValueView(launch);
+  const cap = row.querySelector(".launch-cap");
+  cap.textContent = view.cap;
+  cap.className = "launch-cap " + view.capClass;
+  cap.title = view.source ? `${view.source} · current value` : view.cap;
+
+  const state = row.querySelector(".migration");
+  state.textContent = view.state;
+  state.className = "migration " + view.stateClass;
+}
+
+function updateSelectedMarket(launch, final = false) {
+  const target = $("selected-market-value");
+  if (!target || !launch?.value?.graduated) return;
+  const amount = launch.dexMarket && (launch.dexMarket.marketCap ?? launch.dexMarket.fdv);
+  if (amount != null) {
+    const kind = launch.dexMarket.marketCap != null ? "MKT" : "FDV";
+    target.innerHTML = `<span style="color:var(--green);font-size:17px">${kind} $${compactNumber(amount)}</span>
+      <span style="color:var(--faint)"> &nbsp;·&nbsp; Dexscreener, post-migration pool</span>`;
+  } else if (final) {
+    target.textContent = "Migrated, but Dexscreener has no indexed market for this token yet.";
+  }
 }
 
 function render(input, meta, result) {
@@ -922,9 +1095,8 @@ function render(input, meta, result) {
 
   const v = result.value;
   if (v && v.graduated) {
-    html += `<div class="kv"><div class="k">market cap</div><div class="v" style="font-family:var(--sans);color:var(--dim)">
-      Graduated — the bonding curve is empty and liquidity has moved to the Uniswap v4 pool.
-      This page prices launches from the curve, so it will not quote a figure it cannot read.
+    html += `<div class="kv"><div class="k">market cap</div><div class="v" id="selected-market-value" style="font-family:var(--sans);color:var(--dim)">
+      Migrated — checking the post-migration pool on Dexscreener…
     </div></div>`;
   } else if (v) {
     const money = (u) => "$" + Math.round(u).toLocaleString();
@@ -965,15 +1137,27 @@ function render(input, meta, result) {
     }
   }
 
+  html += `<div class="kv creator-wallet"><div class="k">creator wallet</div><div class="v">
+    <a href="${EXPLORER}/address/${result.deployer}" target="_blank" rel="noopener" title="Open creator wallet on Blockscout">${esc(result.deployer)}</a>
+    ${copyBtn(result.deployer)}
+  </div></div>`;
+
+  if (infra) {
+    html += `<div class="warnbox"><b>⚠ ${esc(infra.name)} — not a person.</b> ${esc(infra.why)}</div>`;
+  }
+
   if (result.launches && result.launches.length) {
     html += `<div class="launches">`;
     for (const l of result.launches) {
+      const valueView = launchValueView(l);
       const addressButton = `<button class="token-address" data-copy="${esc(l.token)}" title="Copy full token contract" aria-label="Copy token contract ${esc(l.token)}">${short(l.token)}</button>`;
       const label = l.symbol
         ? `<b>$${esc(l.symbol)}</b> ${addressButton}`
         : addressButton;
-      html += `<div class="launch">
-        <span class="t">${label}</span>
+      html += `<div class="launch" id="launch-${l.token.slice(2).toLowerCase()}">
+        <span class="t launch-label">${label}</span>
+        <span class="launch-cap ${valueView.capClass}" title="${esc(valueView.source || valueView.cap)}">${valueView.cap}</span>
+        <span class="migration ${valueView.stateClass}">${valueView.state}</span>
         <span class="when">${l.when || "block " + l.block.toLocaleString()}</span>
         <button class="launch-copy" data-copy="${esc(l.token)}" title="Copy token contract" aria-label="Copy token contract ${esc(l.token)}">copy CA</button>
         <a href="${EXPLORER}/tx/${l.txHash}" target="_blank" rel="noopener">tx ↗</a>
@@ -1037,15 +1221,45 @@ async function trace() {
     }
 
     const launches = logs.map(parseLog).sort((a, b) => b.block - a.block);
+    if (viaToken) {
+      const seed = parseLog(asToken[0]);
+      if (!launches.some((l) => l.token.toLowerCase() === seed.token.toLowerCase())) launches.unshift(seed);
+    }
     const meta = await readToken(input);
 
     // price the token off its own curve, but only when the input IS the token
     const value = viaToken ? await readCurveValue(parseLog(asToken[0]), meta.supplyRaw) : null;
 
-    status.textContent = `naming ${Math.min(launches.length, 40)} launch${launches.length === 1 ? "" : "es"}…`;
-    await Promise.all([nameLaunches(launches), attachTimes(launches)]);
+    if (viaToken) {
+      const enteredLaunch = launches.find((l) => l.token.toLowerCase() === input.toLowerCase());
+      if (enteredLaunch) {
+        enteredLaunch.name = meta.name;
+        enteredLaunch.symbol = meta.symbol;
+        enteredLaunch.value = value;
+        enteredLaunch.detailsState = value ? "ready" : "unavailable";
+      }
+    }
 
+    status.textContent = "loading launch dates…";
+    await attachTimes(launches);
     render(input, meta, { status: "resolved", deployer, viaToken, launches, scanned, value });
+
+    status.textContent = `pricing 0 / ${launches.length} launches from their live curves…`;
+    await Promise.all([
+      enrichLaunches(launches, (launch, completed, total) => {
+        updateLaunchRow(launch);
+        status.textContent = `pricing ${completed.toLocaleString()} / ${total.toLocaleString()} launches · curve + Dexscreener…`;
+      }),
+      attachDexMarkets(launches, (launch) => {
+        updateLaunchRow(launch);
+        if (viaToken && launch.token.toLowerCase() === input.toLowerCase()) updateSelectedMarket(launch);
+      }),
+    ]);
+    if (viaToken) {
+      const selected = launches.find((l) => l.token.toLowerCase() === input.toLowerCase());
+      updateSelectedMarket(selected, true);
+    }
+
     const days = (scanned * 0.11) / 86400;
     status.textContent =
       `done — ${launches.length} launch${launches.length === 1 ? "" : "es"} in the last ` +

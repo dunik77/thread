@@ -8,6 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
+    "build:site": "node scripts/build-site.js",
     "test": "node --test test/*.test.js",
     "serve": "node server.js"
   },
