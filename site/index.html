@@ -9,72 +9,99 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
-    --bg:#0a0d0b;
-    --panel:#0e120f;
-    --line:#1c2a1e;
-    --line-soft:#141c15;
-    --text:#e8f0e6;
-    --dim:#7d9481;
-    --faint:#4c5f4f;
-    --green:#9dff3d;
-    --green-deep:#35d96a;
-    --amber:#f0c163;
+    --bg:#050806;
+    --panel:#0c120e;
+    --panel-bright:#101a13;
+    --line:#29432f;
+    --line-soft:#17251b;
+    --text:#f2fff0;
+    --dim:#9bb09e;
+    --faint:#607964;
+    --green:#a8ff3e;
+    --green-deep:#4ef58a;
+    --amber:#ffd45f;
+    --cyan:#60f6d2;
+    --violet:#b590ff;
+    --glow:rgba(168,255,62,.2);
     --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
     --mono:'IBM Plex Mono',ui-monospace,'SF Mono',monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
   body{
-    background:var(--bg);color:var(--text);
+    background:
+      radial-gradient(circle at 82% 8%,rgba(181,144,255,.14),transparent 28rem),
+      radial-gradient(circle at 14% 2%,rgba(78,245,138,.13),transparent 25rem),
+      var(--bg);color:var(--text);
     font-family:var(--sans);font-size:15px;line-height:1.62;
-    -webkit-font-smoothing:antialiased;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden;
   }
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.22;
+    background-image:linear-gradient(rgba(168,255,62,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(168,255,62,.08) 1px,transparent 1px);
+    background-size:56px 56px;mask-image:linear-gradient(to bottom,#000,transparent 72%);
+  }
+  ::selection{background:var(--green);color:#071007;}
   a{color:inherit;}
-  .wrap{max-width:1080px;margin:0 auto;padding:0 28px;}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 32px;}
 
   /* ---------- nav ---------- */
   nav{
     position:sticky;top:0;z-index:20;
-    background:rgba(10,13,11,0.92);backdrop-filter:blur(8px);
-    border-bottom:1px solid var(--line-soft);
+    background:rgba(5,8,6,0.76);backdrop-filter:blur(18px) saturate(140%);
+    border-bottom:1px solid rgba(168,255,62,.13);
   }
-  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;gap:24px;}
-  .brand{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;letter-spacing:0.04em;}
-  .brand img{width:22px;height:22px;display:block;}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:66px;gap:24px;}
+  .brand{display:flex;align-items:center;gap:11px;font-family:var(--mono);font-size:15px;letter-spacing:0.04em;}
+  .brand img{width:30px;height:30px;display:block;border-radius:7px;box-shadow:0 0 20px var(--glow);}
   .brand b{color:var(--green);font-weight:600;}
   nav ul{display:flex;gap:22px;list-style:none;font-family:var(--mono);font-size:12px;color:var(--dim);}
-  nav ul a{text-decoration:none;}
+  nav ul a{text-decoration:none;transition:color .2s,text-shadow .2s;}
   nav ul a:hover{color:var(--green);}
   @media (max-width:860px){nav ul{display:none;}}
 
   /* ---------- hero ---------- */
-  header.hero{padding:96px 0 64px;border-bottom:1px solid var(--line-soft);}
+  header.hero{position:relative;padding:96px 0 72px;border-bottom:1px solid var(--line-soft);isolation:isolate;}
+  header.hero::after{content:"";position:absolute;width:34rem;height:34rem;right:-10rem;top:-12rem;z-index:-1;border-radius:50%;background:rgba(168,255,62,.08);filter:blur(80px);}
+  .hero-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);gap:74px;align-items:center;}
   .eyebrow{
     font-family:var(--mono);font-size:11.5px;letter-spacing:0.16em;
-    text-transform:uppercase;color:var(--faint);margin-bottom:26px;
+    display:inline-flex;align-items:center;gap:10px;text-transform:uppercase;color:var(--green-deep);margin-bottom:26px;
   }
+  .eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 14px var(--green);animation:pulse 2s ease-in-out infinite;}
   h1{
-    font-size:clamp(34px,5.2vw,58px);line-height:1.08;font-weight:600;
+    font-size:clamp(42px,6.2vw,72px);line-height:1.01;font-weight:600;
     letter-spacing:-0.02em;max-width:19ch;text-wrap:balance;
   }
-  h1 .hl{color:var(--green);}
+  h1 .hl{color:var(--green);text-shadow:0 0 34px rgba(168,255,62,.28);}
   .lede{margin-top:26px;max-width:60ch;color:var(--dim);font-size:17px;}
   .lede b{color:var(--text);font-weight:500;}
 
   .cta{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap;}
   .btn{
     font-family:var(--mono);font-size:13px;text-decoration:none;
-    padding:11px 20px;border-radius:3px;border:1px solid var(--line);
-    color:var(--text);white-space:nowrap;
+    padding:12px 21px;border-radius:8px;border:1px solid var(--line);
+    color:var(--text);white-space:nowrap;transition:transform .2s,border-color .2s,box-shadow .2s,background .2s;
   }
-  .btn:hover{border-color:var(--green);color:var(--green);}
-  .btn.primary{background:var(--green);color:#0a0d0b;border-color:var(--green);font-weight:600;}
-  .btn.primary:hover{background:#b4ff6b;color:#0a0d0b;}
+  .btn:hover{border-color:var(--green);color:var(--green);transform:translateY(-2px);}
+  .btn.primary{background:linear-gradient(135deg,var(--green),var(--green-deep));color:#061008;border-color:transparent;font-weight:600;box-shadow:0 10px 30px rgba(78,245,138,.16);}
+  .btn.primary:hover{background:linear-gradient(135deg,#c2ff7d,#62ff9b);color:#061008;box-shadow:0 12px 34px rgba(78,245,138,.3);}
+
+  .hero-visual{position:relative;min-height:410px;display:grid;place-items:center;}
+  .signal-card{position:relative;width:min(100%,380px);aspect-ratio:1/1;border:1px solid rgba(168,255,62,.24);border-radius:28px;background:linear-gradient(145deg,rgba(20,34,24,.9),rgba(6,10,8,.7));box-shadow:0 30px 80px rgba(0,0,0,.45),inset 0 1px rgba(255,255,255,.08),0 0 70px rgba(168,255,62,.08);overflow:hidden;transform:rotate(2deg);}
+  .signal-card::before{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 32%,rgba(168,255,62,.13) 50%,transparent 68%);transform:translateX(-100%);animation:scan 5s ease-in-out infinite;z-index:2;pointer-events:none;}
+  .signal-card img{width:100%;height:100%;object-fit:cover;filter:saturate(1.25) contrast(1.05);}
+  .signal-tag{position:absolute;z-index:3;font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;padding:8px 11px;border:1px solid var(--line);border-radius:7px;background:rgba(5,8,6,.86);backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.35);}
+  .signal-tag.one{left:-22px;top:54px;color:var(--cyan);}
+  .signal-tag.two{right:-18px;bottom:62px;color:var(--amber);}
+  .orbit{position:absolute;width:440px;height:440px;border:1px dashed rgba(181,144,255,.25);border-radius:50%;animation:spin 26s linear infinite;pointer-events:none;}
+  .orbit::before,.orbit::after{content:"";position:absolute;width:9px;height:9px;border-radius:50%;background:var(--violet);box-shadow:0 0 18px var(--violet);}
+  .orbit::before{left:46px;top:55px}.orbit::after{right:21px;bottom:99px;background:var(--cyan);box-shadow:0 0 18px var(--cyan);}
 
   /* live chain strip */
   .live{
     display:flex;gap:0;flex-wrap:wrap;margin-top:44px;
-    border:1px solid var(--line);border-radius:4px;overflow:hidden;
+    border:1px solid rgba(168,255,62,.2);border-radius:12px;overflow:hidden;background:rgba(11,18,13,.65);box-shadow:0 18px 55px rgba(0,0,0,.22);
   }
   .live div{
     flex:1 1 150px;padding:14px 18px;border-right:1px solid var(--line);
@@ -86,12 +113,13 @@
   .live .v.pending{color:var(--faint);}
 
   /* ---------- sections ---------- */
-  section{padding:76px 0;border-bottom:1px solid var(--line-soft);}
+  section{position:relative;padding:92px 0;border-bottom:1px solid var(--line-soft);}
+  section:nth-of-type(even){background:linear-gradient(90deg,transparent,rgba(78,245,138,.025),transparent);}
   .num{
     font-family:var(--mono);font-size:11.5px;letter-spacing:0.16em;
     color:var(--green-deep);margin-bottom:16px;
   }
-  h2{font-size:clamp(24px,3.2vw,33px);line-height:1.18;font-weight:600;letter-spacing:-0.01em;max-width:24ch;text-wrap:balance;}
+  h2{font-size:clamp(28px,3.8vw,42px);line-height:1.12;font-weight:600;letter-spacing:-0.02em;max-width:24ch;text-wrap:balance;}
   section p{margin-top:20px;max-width:66ch;color:var(--dim);}
   section p b{color:var(--text);font-weight:500;}
   section p code, li code, td code{
@@ -99,14 +127,15 @@
     background:var(--panel);padding:1px 5px;border-radius:3px;
   }
 
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:34px;border-radius:4px;overflow:hidden;}
-  .grid .cell{background:var(--bg);padding:22px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:36px;}
+  .grid .cell{background:linear-gradient(145deg,rgba(17,27,20,.95),rgba(8,13,10,.9));padding:25px;border:1px solid var(--line);border-radius:12px;box-shadow:0 15px 45px rgba(0,0,0,.18);transition:transform .22s,border-color .22s,box-shadow .22s;}
+  .grid .cell:hover{transform:translateY(-4px);border-color:rgba(168,255,62,.55);box-shadow:0 20px 55px rgba(0,0,0,.3),0 0 24px rgba(168,255,62,.06);}
   .grid .cell h3{font-family:var(--mono);font-size:12px;letter-spacing:0.09em;text-transform:uppercase;color:var(--green);margin-bottom:10px;font-weight:600;}
   .grid .cell p{margin:0;font-size:14px;}
 
   pre{
-    margin-top:26px;background:var(--panel);border:1px solid var(--line);
-    border-radius:4px;padding:18px 20px;overflow-x:auto;
+    margin-top:26px;background:linear-gradient(145deg,#0d1510,#080c09);border:1px solid var(--line);
+    border-radius:12px;padding:22px 24px;overflow-x:auto;box-shadow:0 22px 55px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.035);
     font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--text);
   }
   pre .c{color:var(--faint);}
@@ -114,7 +143,7 @@
   pre .a{color:var(--amber);}
 
   table{width:100%;border-collapse:collapse;margin-top:30px;font-size:14px;}
-  th,td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  th,td{text-align:left;padding:15px 16px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
   th{font-family:var(--mono);font-size:10.5px;letter-spacing:0.13em;text-transform:uppercase;color:var(--faint);font-weight:400;}
   td{color:var(--dim);}
   td:first-child{color:var(--text);font-family:var(--mono);font-size:13px;white-space:nowrap;}
@@ -122,7 +151,7 @@
   td .no{color:var(--amber);}
 
   figure{margin-top:34px;}
-  figure img{width:100%;display:block;border:1px solid var(--line);border-radius:4px;}
+  figure img{width:100%;display:block;border:1px solid rgba(168,255,62,.24);border-radius:14px;box-shadow:0 28px 70px rgba(0,0,0,.38),0 0 40px rgba(78,245,138,.055);}
   figcaption{margin-top:14px;font-size:13px;color:var(--faint);max-width:70ch;}
 
   ul.plain{margin-top:24px;list-style:none;max-width:66ch;}
@@ -131,17 +160,102 @@
   ul.plain li b{color:var(--text);font-weight:500;}
 
   .callout{
-    margin-top:32px;padding:22px 24px;border-left:2px solid var(--amber);
-    background:rgba(240,193,99,0.045);border-radius:0 4px 4px 0;
+    margin-top:32px;padding:24px 26px;border:1px solid rgba(255,212,95,.24);border-left:3px solid var(--amber);
+    background:linear-gradient(90deg,rgba(255,212,95,.085),rgba(255,212,95,.025));border-radius:0 12px 12px 0;box-shadow:0 16px 45px rgba(0,0,0,.15);
   }
   .callout p{margin:0;color:var(--dim);}
   .callout p + p{margin-top:12px;}
 
-  footer{padding:56px 0 72px;}
+  /* ---------- live lookup ---------- */
+  #try .wrap{padding-top:38px;padding-bottom:38px;border:1px solid rgba(168,255,62,.25);border-radius:20px;background:linear-gradient(135deg,rgba(18,30,21,.92),rgba(8,13,10,.9));box-shadow:0 28px 80px rgba(0,0,0,.35),0 0 80px rgba(168,255,62,.055);}
+  .lookup{display:flex;gap:10px;margin-top:30px;flex-wrap:wrap;}
+  .lookup input{
+    flex:1 1 380px;background:rgba(5,9,7,.8);border:1px solid var(--line);border-radius:9px;
+    color:var(--text);font-family:var(--mono);font-size:14px;padding:15px 17px;transition:border-color .2s,box-shadow .2s;
+  }
+  .lookup input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(168,255,62,.1);}
+  .lookup button{
+    font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0.06em;
+    background:linear-gradient(135deg,var(--green),var(--green-deep));color:#071008;border:none;border-radius:9px;
+    padding:0 26px;cursor:pointer;
+  }
+  .lookup button:hover{background:#b4ff6b;}
+  .lookup button:disabled{background:var(--faint);color:var(--panel);cursor:default;}
+
+  .chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .chips button{
+    font-family:var(--mono);font-size:11px;color:var(--dim);background:none;
+    border:1px solid var(--line);border-radius:99px;padding:5px 12px;cursor:pointer;
+  }
+  .chips button{transition:transform .2s,border-color .2s,color .2s;}
+  .chips button:hover{border-color:var(--green);color:var(--green);transform:translateY(-1px);}
+  .status{font-family:var(--mono);font-size:12px;color:var(--faint);margin-top:14px;min-height:18px;}
+  .status.err{color:var(--amber);}
+
+  .res{margin-top:26px;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.2);}
+  .res .head{
+    padding:18px 20px;border-bottom:1px solid var(--line);background:var(--panel);
+    display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:baseline;
+  }
+  .res .head .name{font-size:19px;font-weight:600;}
+  .res .head .sym{font-family:var(--mono);color:var(--amber);font-size:13px;margin-left:8px;}
+  .res .head .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--faint);}
+  .res .kv{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line-soft);font-size:13.5px;}
+  .res .kv:last-child{border-bottom:none;}
+  .res .kv .k{font-family:var(--mono);font-size:10.5px;letter-spacing:0.11em;text-transform:uppercase;color:var(--faint);padding-top:3px;}
+  .res .kv .v{font-family:var(--mono);word-break:break-all;color:var(--text);}
+  .res .kv .v a{color:var(--green);text-decoration:none;}
+  .res .kv .v a:hover{text-decoration:underline;}
+  .res .kv .v button.mini{
+    font-family:var(--mono);font-size:10.5px;color:var(--dim);background:none;
+    border:1px solid var(--line);border-radius:3px;padding:2px 7px;margin-left:8px;cursor:pointer;
+  }
+  .res .kv .v button.mini:hover{border-color:var(--green);color:var(--green);}
+
+  .warnbox{margin:0;padding:16px 20px;border-bottom:1px solid var(--line);background:rgba(240,193,99,0.06);border-left:2px solid var(--amber);font-size:13px;color:var(--dim);}
+  .warnbox b{color:var(--amber);}
+
+  .launches{max-height:420px;overflow-y:auto;}
+  .launch{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:11px 20px;border-bottom:1px solid var(--line-soft);font-size:13px;}
+  .launch:last-child{border-bottom:none;}
+  .launch .t{font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .launch .t b{color:var(--amber);font-weight:600;}
+  .launch .t span{color:var(--faint);}
+  .launch .when{font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap;}
+  .launch a{font-family:var(--mono);font-size:11px;color:var(--green);text-decoration:none;border:1px solid var(--line);border-radius:3px;padding:3px 8px;white-space:nowrap;}
+  .launch a:hover{border-color:var(--green);}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);
+    background:var(--panel);border:1px solid var(--green);color:var(--text);
+    font-family:var(--mono);font-size:12px;padding:9px 16px;border-radius:4px;
+    opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:40;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  @media (prefers-reduced-motion:reduce){.toast{transition:none;}}
+
+  footer{padding:64px 0 78px;background:linear-gradient(to bottom,transparent,rgba(78,245,138,.025));}
   footer .cols{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;}
   footer p{color:var(--faint);font-size:13px;max-width:62ch;}
   footer a{color:var(--dim);}
   footer .legal{margin-top:26px;font-size:11.5px;color:#374439;font-family:var(--mono);line-height:1.8;max-width:none;}
+
+  @keyframes pulse{50%{opacity:.45;transform:scale(.75);}}
+  @keyframes scan{0%,28%{transform:translateX(-110%)}70%,100%{transform:translateX(110%)}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (max-width:900px){
+    .hero-grid{grid-template-columns:1fr;gap:52px}.hero-copy{max-width:760px}.hero-visual{min-height:330px}.signal-card{width:310px}.orbit{width:360px;height:360px}
+  }
+  @media (max-width:620px){
+    .wrap{padding-left:20px;padding-right:20px}header.hero{padding:70px 0 50px}section{padding:68px 0}h1{font-size:clamp(40px,13vw,56px)}
+    .hero-copy{min-width:0;overflow:hidden}
+    .eyebrow{display:block;position:relative;padding-left:17px;font-size:9.5px;letter-spacing:.11em;line-height:1.55;white-space:normal}.eyebrow::before{position:absolute;left:0;top:.42em}
+    .lede{font-size:16px;max-width:100%}
+    .hero-visual{min-height:280px}.signal-card{width:250px;border-radius:20px}.orbit{width:290px;height:290px}.signal-tag.one{left:-8px}.signal-tag.two{right:-8px}
+    .live div{flex-basis:50%;border-bottom:1px solid var(--line)}.lookup button{min-height:48px;flex:1 1 100%}#try .wrap{margin-inline:10px;padding:28px 20px}
+    .res .kv{grid-template-columns:1fr;gap:4px}.launch{grid-template-columns:1fr auto}.launch .when{display:none}table{display:block;overflow-x:auto}footer .cols p:last-child{text-align:left!important}
+  }
+  @media (prefers-reduced-motion:reduce){.orbit,.signal-card::before,.eyebrow::before{animation:none}.btn,.grid .cell{transition:none}}
 </style>
 </head>
 <body>
@@ -150,6 +264,7 @@
   <div class="wrap">
     <span class="brand"><img src="../assets/avatar.png" alt=""><b>thread</b></span>
     <ul>
+      <li><a href="#try">00 Try it</a></li>
       <li><a href="#problem">01 Problem</a></li>
       <li><a href="#finding">02 Finding</a></li>
       <li><a href="#trace">03 Trace</a></li>
@@ -163,16 +278,26 @@
 
 <header class="hero">
   <div class="wrap">
-    <div class="eyebrow">pons v2 · robinhood chain 4663 · read-only</div>
-    <h1>Every launch is new. The people <span class="hl">behind them</span> are not.</h1>
-    <p class="lede">
-      thread reads a Pons v2 launch and tells you what else the same deployer has shipped —
-      named, dated, and linked to the transaction. <b>No score. No verdict.</b> Just what the
-      chain already recorded and nobody was keeping.
-    </p>
-    <div class="cta">
-      <a class="btn primary" href="https://github.com/dunik77/thread">READ THE SOURCE ↗</a>
-      <a class="btn" href="#run">RUN IT LOCALLY</a>
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <div class="eyebrow">pons v2 · robinhood chain 4663 · read-only</div>
+        <h1>Every launch is new. The people <span class="hl">behind them</span> are not.</h1>
+        <p class="lede">
+          thread reads a Pons v2 launch and tells you what else the same deployer has shipped —
+          named, dated, and linked to the transaction. <b>No score. No verdict.</b> Just what the
+          chain already recorded and nobody was keeping.
+        </p>
+        <div class="cta">
+          <a class="btn primary" href="#try">TRACE AN ADDRESS →</a>
+          <a class="btn" href="https://github.com/dunik77/thread">VIEW SOURCE ↗</a>
+        </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <div class="orbit"></div>
+        <div class="signal-card"><img src="../assets/avatar.png" alt=""></div>
+        <div class="signal-tag one">● chain signal found</div>
+        <div class="signal-tag two">31 linked launches ↗</div>
+      </div>
     </div>
 
     <div class="live" id="live">
@@ -184,6 +309,26 @@
     </div>
   </div>
 </header>
+
+<section id="try">
+  <div class="wrap">
+    <div class="num">00 — TRY IT HERE</div>
+    <h2>Paste a Pons v2 token. Meet its deployer.</h2>
+    <p>
+      This runs in your browser, against the public RPC, with <b>no key and no backend</b>. It reads the
+      factory's own <code>TokenLaunched</code> log directly — the same path the tool falls back to when its
+      indexer goes quiet.
+    </p>
+
+    <div class="lookup">
+      <input type="text" id="addr" placeholder="0x… token or deployer address" spellcheck="false" autocomplete="off">
+      <button id="go">TRACE</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="status" id="status"></div>
+    <div id="out"></div>
+  </div>
+</section>
 
 <section id="problem">
   <div class="wrap">
@@ -398,6 +543,8 @@
   </div>
 </footer>
 
+<div class="toast" id="toast">Copied.</div>
+
 <script>
 /*
  * The three live numbers are real reads against the public Robinhood Chain
@@ -452,6 +599,331 @@ async function loadLive() {
 }
 
 loadLive();
+
+/* ============================================================
+ * The lookup, entirely in the browser.
+ *
+ * This is src/factory-logs.js ported to the page: eth_getLogs straight at
+ * the Pons v2 factory, constrained to the real TokenLaunched signature, with
+ * the address pinned to the token position (topic 1) or the deployer
+ * position (topic 3). No key, no backend, nothing cached -- which is the
+ * only reason a static page can do the whole flow at all.
+ *
+ * It is the same fallback path the served tool drops to when its indexer
+ * goes quiet, so what you see here is not a demo of the product, it is a
+ * slice of the product.
+ * ============================================================ */
+
+const FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
+const TOKEN_LAUNCHED = "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607";
+const EXPLORER = "https://robinhoodchain.blockscout.com";
+
+// contracts that can occupy a deployer slot without being anyone -- see
+// src/known-infra.js, and section 02 above for how this one was confirmed
+const KNOWN_INFRA = {
+  "0xca11bde05977b3631167028862be2a173976ca11": {
+    name: "Multicall3",
+    why: "A generic batching contract at the same address on nearly every EVM chain. Launches routed through it record the batcher as msg.sender, so unrelated people collapse into one apparent deployer. These launches are not evidence of a single actor.",
+  },
+};
+
+const EXAMPLES = [
+  { a: "0xa146cc739a09d0543e7e5b525f8eca26bb518032", tag: "a token — resolves to its deployer" },
+  { a: "0xca11bde05977b3631167028862be2a173976ca11", tag: "Multicall3 — the false positive" },
+  { a: "0x385F4f8ae47651ce5F58F5265395a669f8281e18", tag: "not a Pons v2 launch" },
+];
+
+const $ = (id) => document.getElementById(id);
+const isAddr = (a) => /^0x[0-9a-fA-F]{40}$/.test(a);
+const short = (a) => a.slice(0, 8) + "…" + a.slice(-6);
+const pad = (a) => "0x" + "0".repeat(24) + a.slice(2).toLowerCase();
+const fromTopic = (t) => "0x" + t.slice(26).toLowerCase();
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function logFilter(address, position) {
+  const topics = [TOKEN_LAUNCHED, null, null, null];
+  topics[position] = pad(address);
+  return { address: FACTORY, topics, fromBlock: "0x0", toBlock: "latest" };
+}
+
+/**
+ * The token position (topic 1) is cheap: the node answers a full-range query
+ * for it in a fraction of a second.
+ */
+async function getLogs(address, position) {
+  return rpc("eth_getLogs", [logFilter(address, position)]);
+}
+
+/**
+ * The deployer position (topic 3) is not cheap. Measured against this RPC on
+ * 2026-09-08: a 1,000,000-block window answers in ~0.3s, while 3,000,000 and
+ * up simply return "log query timed out". So the deployer's history is
+ * gathered in windows, walking backwards from the head.
+ *
+ * The window is bounded on purpose, and the page says how far it looked. A
+ * search that stops after N blocks and an address with no launches produce
+ * the same empty list, and the difference matters -- so it is reported, not
+ * hidden. This is rule 3 in RULES.md applied to a block range.
+ */
+const CHUNK = 1_000_000;
+const MAX_CHUNKS = 10;
+
+async function getDeployerLogs(deployer, onProgress) {
+  const head = parseInt(await rpc("eth_blockNumber"), 16);
+  const found = [];
+  let scanned = 0;
+
+  for (let i = 0; i < MAX_CHUNKS; i++) {
+    const to = head - i * CHUNK;
+    const from = Math.max(0, to - CHUNK + 1);
+    if (to <= 0) break;
+
+    const filter = logFilter(deployer, 3);
+    filter.fromBlock = "0x" + from.toString(16);
+    filter.toBlock = "0x" + to.toString(16);
+
+    try {
+      const logs = await rpc("eth_getLogs", [filter]);
+      found.push(...logs);
+      scanned = head - from;
+      if (onProgress) onProgress(found.length, scanned);
+    } catch (err) {
+      // a window that failed is a hole in the search, not an absence --
+      // stop and report how far the search actually got
+      break;
+    }
+    if (from === 0) break;
+  }
+  return { logs: found, scanned, head };
+}
+
+function decodeString(hex) {
+  try {
+    const h = hex.slice(2);
+    const len = parseInt(h.slice(64, 128), 16);
+    const bytes = (h.slice(128, 128 + len * 2).match(/.{1,2}/g) || []).map((b) => parseInt(b, 16));
+    return new TextDecoder().decode(new Uint8Array(bytes)) || null;
+  } catch { return null; }
+}
+
+async function readToken(address) {
+  const out = { name: null, symbol: null, supply: null, isContract: false };
+  try {
+    const code = await rpc("eth_getCode", [address, "latest"]);
+    out.isContract = code && code !== "0x";
+    if (!out.isContract) return out;
+    const calls = await Promise.allSettled([
+      rpc("eth_call", [{ to: address, data: "0x06fdde03" }, "latest"]),
+      rpc("eth_call", [{ to: address, data: "0x95d89b41" }, "latest"]),
+      rpc("eth_call", [{ to: address, data: "0x18160ddd" }, "latest"]),
+      rpc("eth_call", [{ to: address, data: "0x313ce567" }, "latest"]),
+    ]);
+    const val = (i) => (calls[i].status === "fulfilled" ? calls[i].value : null);
+    out.name = val(0) && decodeString(val(0));
+    out.symbol = val(1) && decodeString(val(1));
+    if (val(2)) {
+      const dec = val(3) ? parseInt(val(3), 16) : 18;
+      out.supply = (BigInt(val(2)) / 10n ** BigInt(dec)).toString();
+    }
+  } catch {}
+  return out;
+}
+
+/** Fill in real block timestamps, capped so a long history doesn't hammer the RPC. */
+async function attachTimes(launches) {
+  const blocks = [...new Set(launches.map((l) => l.blockHex))].slice(0, 40);
+  const times = new Map();
+  const queue = [...blocks];
+  await Promise.all(Array.from({ length: Math.min(6, queue.length) }, async () => {
+    while (queue.length) {
+      const b = queue.shift();
+      try {
+        const blk = await rpc("eth_getBlockByNumber", [b, false]);
+        if (blk) times.set(b, parseInt(blk.timestamp, 16));
+      } catch {}
+    }
+  }));
+  for (const l of launches) {
+    const t = times.get(l.blockHex);
+    l.when = t ? new Date(t * 1000).toISOString().slice(0, 16).replace("T", " ") : null;
+  }
+}
+
+/** Name each launched token, capped concurrency, failures left blank rather than guessed. */
+async function nameLaunches(launches) {
+  const queue = [...launches].slice(0, 40);
+  await Promise.all(Array.from({ length: Math.min(6, queue.length) }, async () => {
+    while (queue.length) {
+      const l = queue.shift();
+      const meta = await readToken(l.token);
+      l.name = meta.name;
+      l.symbol = meta.symbol;
+    }
+  }));
+}
+
+function parseLog(log) {
+  return {
+    token: fromTopic(log.topics[1]),
+    deployer: fromTopic(log.topics[3]),
+    txHash: log.transactionHash,
+    blockHex: log.blockNumber,
+    block: parseInt(log.blockNumber, 16),
+  };
+}
+
+function copyBtn(value) {
+  return `<button class="mini" data-copy="${esc(value)}">copy</button>`;
+}
+
+function render(input, meta, result) {
+  const out = $("out");
+
+  if (result.status === "not-found") {
+    out.innerHTML = `<div class="res">
+      <div class="head"><span class="name">Not a Pons v2 launch</span><span class="tag">checked, not assumed</span></div>
+      <div class="kv"><div class="k">address</div><div class="v">${esc(input)}${copyBtn(input)}</div></div>
+      <div class="kv"><div class="k">what was done</div><div class="v" style="font-family:var(--sans);color:var(--dim)">
+        The factory's TokenLaunched log was read directly: this address is not a launched token anywhere in the
+        log, and it deployed nothing in the window searched below. That is a checked result, not a timeout —
+        but it is bounded, and the bound is stated rather than glossed over.
+      </div></div>
+    </div>`;
+    return;
+  }
+
+  const infra = KNOWN_INFRA[result.deployer.toLowerCase()];
+  const head = meta.isContract && meta.name
+    ? `<span class="name">${esc(meta.name)}${meta.symbol ? `<span class="sym">$${esc(meta.symbol)}</span>` : ""}</span>`
+    : `<span class="name">${result.viaToken ? "Token" : "Deployer"}</span>`;
+
+  let html = `<div class="res">
+    <div class="head">${head}<span class="tag">${result.launches.length} launch${result.launches.length === 1 ? "" : "es"} by this deployer</span></div>`;
+
+  if (meta.isContract && meta.supply) {
+    html += `<div class="kv"><div class="k">total supply</div><div class="v">${Number(meta.supply).toLocaleString()} ${esc(meta.symbol || "")}</div></div>`;
+  }
+  html += `<div class="kv"><div class="k">deployer</div><div class="v">
+      <a href="${EXPLORER}/address/${result.deployer}" target="_blank" rel="noopener">${result.deployer}</a>${copyBtn(result.deployer)}
+    </div></div>`;
+
+  if (infra) {
+    html += `<div class="warnbox"><b>⚠ ${esc(infra.name)} — not a person.</b> ${esc(infra.why)}</div>`;
+  }
+
+  if (result.launches.length) {
+    html += `<div class="launches">`;
+    for (const l of result.launches) {
+      const label = l.symbol
+        ? `<b>$${esc(l.symbol)}</b> <span>${short(l.token)}</span>`
+        : `<span>${short(l.token)}</span>`;
+      html += `<div class="launch">
+        <span class="t">${label}</span>
+        <span class="when">${l.when || "block " + l.block.toLocaleString()}</span>
+        <a href="${EXPLORER}/tx/${l.txHash}" target="_blank" rel="noopener">tx ↗</a>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (result.scanned) {
+    const days = (result.scanned * 0.11) / 86400;
+    html += `<div class="kv"><div class="k">search depth</div><div class="v" style="font-family:var(--sans);color:var(--faint)">
+      the last ${result.scanned.toLocaleString()} blocks, about ${days.toFixed(1)} days.
+      Launches older than that are outside this window, not absent — the public RPC times out on
+      wider ranges, so the search is bounded and says so.
+    </div></div>`;
+  }
+
+  html += `</div>`;
+  out.innerHTML = html;
+}
+
+async function trace() {
+  const input = $("addr").value.trim();
+  const status = $("status");
+  const btn = $("go");
+
+  if (!isAddr(input)) {
+    status.className = "status err";
+    status.textContent = "That is not a 0x address — 40 hex characters expected.";
+    return;
+  }
+
+  btn.disabled = true;
+  $("out").innerHTML = "";
+  status.className = "status";
+  status.textContent = "reading the factory log…";
+
+  try {
+    // Is this a launched token? The token position is indexed well enough
+    // that the node answers a full-range query for it instantly. The deployer
+    // position is not -- asking it unbounded just times out -- so it is never
+    // asked that way. If this isn't a token, the input is treated as a
+    // deployer and searched in windows like any other.
+    const asToken = await getLogs(input, 1);
+
+    const deployer = asToken.length ? parseLog(asToken[0]).deployer : input.toLowerCase();
+    const viaToken = asToken.length > 0;
+
+    status.textContent = viaToken
+      ? "found its deployer — walking back through the factory log…"
+      : "not a launched token — checking whether it deployed any…";
+
+    const { logs, scanned } = await getDeployerLogs(deployer, (n, blocks) => {
+      status.textContent = `${n} launch${n === 1 ? "" : "es"} so far, ${blocks.toLocaleString()} blocks back…`;
+    });
+
+    if (!viaToken && logs.length === 0) {
+      render(input, {}, { status: "not-found", scanned });
+      status.textContent = `done — nothing in the last ${scanned.toLocaleString()} blocks`;
+      return;
+    }
+
+    const launches = logs.map(parseLog).sort((a, b) => b.block - a.block);
+    const meta = await readToken(input);
+
+    status.textContent = `naming ${Math.min(launches.length, 40)} launch${launches.length === 1 ? "" : "es"}…`;
+    await Promise.all([nameLaunches(launches), attachTimes(launches)]);
+
+    render(input, meta, { status: "resolved", deployer, viaToken, launches, scanned });
+    const days = (scanned * 0.11) / 86400;
+    status.textContent =
+      `done — ${launches.length} launch${launches.length === 1 ? "" : "es"} in the last ` +
+      `${scanned.toLocaleString()} blocks (~${days.toFixed(1)} days). no key, read straight off the chain`;
+  } catch (err) {
+    status.className = "status err";
+    status.textContent = "The RPC did not answer: " + err.message + ". That is not a verdict about the address — try again.";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$("chips").innerHTML = EXAMPLES.map((e) =>
+  `<button data-a="${e.a}">${short(e.a)} · ${esc(e.tag)}</button>`
+).join("");
+
+document.addEventListener("click", (ev) => {
+  const chip = ev.target.closest("#chips button");
+  if (chip) { $("addr").value = chip.dataset.a; trace(); return; }
+
+  const copy = ev.target.closest("button[data-copy]");
+  if (copy) {
+    navigator.clipboard?.writeText(copy.dataset.copy);
+    const t = $("toast");
+    t.textContent = "Copied " + short(copy.dataset.copy);
+    t.classList.add("show");
+    clearTimeout(window.__t);
+    window.__t = setTimeout(() => t.classList.remove("show"), 1600);
+  }
+});
+
+$("go").addEventListener("click", trace);
+$("addr").addEventListener("keydown", (e) => { if (e.key === "Enter") trace(); });
+
+// ?address=0x… traces on load, so a finding is shareable as a link
+const deep = new URLSearchParams(location.search).get("address");
+if (deep && isAddr(deep)) { $("addr").value = deep; trace(); }
 </script>
 </body>
 </html>
