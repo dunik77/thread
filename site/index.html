@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>thread — new wallets, familiar connections</title>
+<meta name="description" content="A protocol-native history of Pons v2 launches on Robinhood Chain. Read-only, evidence only, no scores.">
+<link rel="icon" href="../assets/avatar.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#0a0d0b;
+    --panel:#0e120f;
+    --line:#1c2a1e;
+    --line-soft:#141c15;
+    --text:#e8f0e6;
+    --dim:#7d9481;
+    --faint:#4c5f4f;
+    --green:#9dff3d;
+    --green-deep:#35d96a;
+    --amber:#f0c163;
+    --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:var(--sans);font-size:15px;line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px;}
+
+  /* ---------- nav ---------- */
+  nav{
+    position:sticky;top:0;z-index:20;
+    background:rgba(10,13,11,0.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line-soft);
+  }
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;gap:24px;}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;letter-spacing:0.04em;}
+  .brand img{width:22px;height:22px;display:block;}
+  .brand b{color:var(--green);font-weight:600;}
+  nav ul{display:flex;gap:22px;list-style:none;font-family:var(--mono);font-size:12px;color:var(--dim);}
+  nav ul a{text-decoration:none;}
+  nav ul a:hover{color:var(--green);}
+  @media (max-width:860px){nav ul{display:none;}}
+
+  /* ---------- hero ---------- */
+  header.hero{padding:96px 0 64px;border-bottom:1px solid var(--line-soft);}
+  .eyebrow{
+    font-family:var(--mono);font-size:11.5px;letter-spacing:0.16em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:26px;
+  }
+  h1{
+    font-size:clamp(34px,5.2vw,58px);line-height:1.08;font-weight:600;
+    letter-spacing:-0.02em;max-width:19ch;text-wrap:balance;
+  }
+  h1 .hl{color:var(--green);}
+  .lede{margin-top:26px;max-width:60ch;color:var(--dim);font-size:17px;}
+  .lede b{color:var(--text);font-weight:500;}
+
+  .cta{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap;}
+  .btn{
+    font-family:var(--mono);font-size:13px;text-decoration:none;
+    padding:11px 20px;border-radius:3px;border:1px solid var(--line);
+    color:var(--text);white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--green);color:var(--green);}
+  .btn.primary{background:var(--green);color:#0a0d0b;border-color:var(--green);font-weight:600;}
+  .btn.primary:hover{background:#b4ff6b;color:#0a0d0b;}
+
+  /* live chain strip */
+  .live{
+    display:flex;gap:0;flex-wrap:wrap;margin-top:44px;
+    border:1px solid var(--line);border-radius:4px;overflow:hidden;
+  }
+  .live div{
+    flex:1 1 150px;padding:14px 18px;border-right:1px solid var(--line);
+    font-family:var(--mono);
+  }
+  .live div:last-child{border-right:none;}
+  .live .k{font-size:10.5px;letter-spacing:0.13em;text-transform:uppercase;color:var(--faint);}
+  .live .v{font-size:16px;margin-top:5px;color:var(--green);font-variant-numeric:tabular-nums;}
+  .live .v.pending{color:var(--faint);}
+
+  /* ---------- sections ---------- */
+  section{padding:76px 0;border-bottom:1px solid var(--line-soft);}
+  .num{
+    font-family:var(--mono);font-size:11.5px;letter-spacing:0.16em;
+    color:var(--green-deep);margin-bottom:16px;
+  }
+  h2{font-size:clamp(24px,3.2vw,33px);line-height:1.18;font-weight:600;letter-spacing:-0.01em;max-width:24ch;text-wrap:balance;}
+  section p{margin-top:20px;max-width:66ch;color:var(--dim);}
+  section p b{color:var(--text);font-weight:500;}
+  section p code, li code, td code{
+    font-family:var(--mono);font-size:0.9em;color:var(--amber);
+    background:var(--panel);padding:1px 5px;border-radius:3px;
+  }
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:34px;border-radius:4px;overflow:hidden;}
+  .grid .cell{background:var(--bg);padding:22px;}
+  .grid .cell h3{font-family:var(--mono);font-size:12px;letter-spacing:0.09em;text-transform:uppercase;color:var(--green);margin-bottom:10px;font-weight:600;}
+  .grid .cell p{margin:0;font-size:14px;}
+
+  pre{
+    margin-top:26px;background:var(--panel);border:1px solid var(--line);
+    border-radius:4px;padding:18px 20px;overflow-x:auto;
+    font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--text);
+  }
+  pre .c{color:var(--faint);}
+  pre .g{color:var(--green);}
+  pre .a{color:var(--amber);}
+
+  table{width:100%;border-collapse:collapse;margin-top:30px;font-size:14px;}
+  th,td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:0.13em;text-transform:uppercase;color:var(--faint);font-weight:400;}
+  td{color:var(--dim);}
+  td:first-child{color:var(--text);font-family:var(--mono);font-size:13px;white-space:nowrap;}
+  td .yes{color:var(--green);}
+  td .no{color:var(--amber);}
+
+  figure{margin-top:34px;}
+  figure img{width:100%;display:block;border:1px solid var(--line);border-radius:4px;}
+  figcaption{margin-top:14px;font-size:13px;color:var(--faint);max-width:70ch;}
+
+  ul.plain{margin-top:24px;list-style:none;max-width:66ch;}
+  ul.plain li{padding-left:22px;position:relative;margin-bottom:13px;color:var(--dim);}
+  ul.plain li::before{content:"→";position:absolute;left:0;color:var(--green-deep);font-family:var(--mono);}
+  ul.plain li b{color:var(--text);font-weight:500;}
+
+  .callout{
+    margin-top:32px;padding:22px 24px;border-left:2px solid var(--amber);
+    background:rgba(240,193,99,0.045);border-radius:0 4px 4px 0;
+  }
+  .callout p{margin:0;color:var(--dim);}
+  .callout p + p{margin-top:12px;}
+
+  footer{padding:56px 0 72px;}
+  footer .cols{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;}
+  footer p{color:var(--faint);font-size:13px;max-width:62ch;}
+  footer a{color:var(--dim);}
+  footer .legal{margin-top:26px;font-size:11.5px;color:#374439;font-family:var(--mono);line-height:1.8;max-width:none;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <span class="brand"><img src="../assets/avatar.png" alt=""><b>thread</b></span>
+    <ul>
+      <li><a href="#problem">01 Problem</a></li>
+      <li><a href="#finding">02 Finding</a></li>
+      <li><a href="#trace">03 Trace</a></li>
+      <li><a href="#answers">04 Answers</a></li>
+      <li><a href="#refuses">05 Rules</a></li>
+      <li><a href="#onchain">06 On-chain</a></li>
+      <li><a href="#run">07 Run it</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">pons v2 · robinhood chain 4663 · read-only</div>
+    <h1>Every launch is new. The people <span class="hl">behind them</span> are not.</h1>
+    <p class="lede">
+      thread reads a Pons v2 launch and tells you what else the same deployer has shipped —
+      named, dated, and linked to the transaction. <b>No score. No verdict.</b> Just what the
+      chain already recorded and nobody was keeping.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/dunik77/thread">READ THE SOURCE ↗</a>
+      <a class="btn" href="#run">RUN IT LOCALLY</a>
+    </div>
+
+    <div class="live" id="live">
+      <div><div class="k">chain height</div><div class="v pending" id="height">reading…</div></div>
+      <div><div class="k">gas price</div><div class="v pending" id="gas">reading…</div></div>
+      <div><div class="k">block time</div><div class="v pending" id="blocktime">reading…</div></div>
+      <div><div class="k">tests passing</div><div class="v">55 / 55</div></div>
+      <div><div class="k">dependencies</div><div class="v">0</div></div>
+    </div>
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap">
+    <div class="num">01 — THE PROBLEM</div>
+    <h2>A launch gets judged alone. Its deployer never does.</h2>
+    <p>
+      Every tool in this space answers the same question: what is this token, right now. Curve, tax,
+      liquidity, holder spread. All of it about one launch, in isolation, as if it arrived from nowhere.
+    </p>
+    <p>
+      But two facts already sit in Pons v2's own contracts and nobody keeps them. The factory records
+      <b>who deployed each token</b>. The fee escrow records <b>who actually gets paid</b> on it. Neither
+      needs guessing at wallet ownership across the wider chain, and both compound: the tenth launch by
+      an address you have already seen is a fact, not an inference.
+    </p>
+    <div class="grid">
+      <div class="cell">
+        <h3>What others read</h3>
+        <p>This contract. This curve. This moment. Then the answer is thrown away.</p>
+      </div>
+      <div class="cell">
+        <h3>What thread reads</h3>
+        <p>The same deployer's other launches, each with the block and transaction that proves it.</p>
+      </div>
+      <div class="cell">
+        <h3>What it never does</h3>
+        <p>Score, rank, or tell you a token is safe. It hands you receipts and stops.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="finding">
+  <div class="wrap">
+    <div class="num">02 — THE FIRST REAL FINDING</div>
+    <h2>The busiest deployer in the sample turned out not to be a person.</h2>
+    <p>
+      Before writing any indexing code, the premise had to be checked: do deployers on Pons v2 repeat at
+      all? A sample of <b>300 consecutive real launches</b> answered it — 275 unique deployers, 12 repeats.
+      The biggest had eight launches and looked exactly like a token farm.
+    </p>
+    <p>
+      It is <b>Multicall3</b>: a generic batching contract deployed at the same address on nearly every EVM
+      chain. Launches routed through it record the batcher as <code>msg.sender</code>, so eight unrelated
+      people collapse into one apparent deployer.
+    </p>
+    <div class="callout">
+      <p>
+        Shipped naively, that would have been thread's own first output, and it would have been false. So
+        every deployer is checked against a list of known shared infrastructure before anything is shown,
+        and each entry on that list carries the evidence that put it there.
+      </p>
+      <p>
+        You do not have to take that on faith. No API key, about a second:
+      </p>
+    </div>
+    <pre><span class="c">$</span> python3 analysis/verify_infra.py 0xca11bde05977b3631167028862be2a173976ca11
+
+  3808 bytes of deployed code — a genuine contract
+
+  known selectors present:
+    <span class="a">0x4d2301cc</span>  getEthBalance(address)        — Multicall3
+    <span class="a">0xa8b0574e</span>  getBasefee()                  — Multicall3
+    <span class="a">0x252dba42</span>  aggregate((address,bytes)[])  — Multicall
+    <span class="a">0x82ad56cb</span>  aggregate3((...)[])           — Multicall3
+
+  <span class="g">Two or more Multicall selectors: this is a batching contract.</span>
+  Launches crediting it as deployer are unrelated callers sharing a router.</pre>
+    <p>
+      The next four repeaters were a different story: distinct EIP-7702 delegated accounts, real people
+      using account abstraction. Those stayed.
+    </p>
+  </div>
+</section>
+
+<section id="trace">
+  <div class="wrap">
+    <div class="num">03 — A TRACE</div>
+    <h2>One address in. Everything that deployer has shipped, out.</h2>
+    <figure>
+      <img src="../assets/terminal.png" alt="thread trace: one token address in, 31 launches by the same recorded deployer out">
+      <figcaption>
+        A real trace, not a mock-up. One token address in, 31 launches by the same recorded deployer out,
+        each row carrying its block and transaction. Note what it says about itself: the query limit was
+        reached, rows were hidden to fit the frame, and fee-recipient history is not implemented.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="answers">
+  <div class="wrap">
+    <div class="num">04 — FOUR ANSWERS</div>
+    <h2>A lookup that fails is not a lookup that found nothing.</h2>
+    <p>
+      This is the distinction most tools quietly collapse, and it is the difference between
+      <b>"this address is clean"</b> and <b>"ask me again later."</b> thread keeps them apart on purpose.
+    </p>
+    <table>
+      <thead><tr><th>answer</th><th>what it means</th><th>how it is earned</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="yes">resolved</span></td>
+          <td>here is the deployer and their launches</td>
+          <td>either data source returned real data</td>
+        </tr>
+        <tr>
+          <td><span class="yes">partial</span></td>
+          <td>deployer confirmed, launch list incomplete</td>
+          <td>a confirmed fact survived a later query failing</td>
+        </tr>
+        <tr>
+          <td><span class="yes">not-found</span></td>
+          <td>not a Pons v2 launch</td>
+          <td>the chain was asked directly and came back clean and empty, in both argument positions</td>
+        </tr>
+        <tr>
+          <td><span class="no">inconclusive</span></td>
+          <td>nobody could tell us</td>
+          <td>both sources failed — never upgraded to a negative</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      The indexer this runs on was observed timing out on genuine zero-match queries rather than returning
+      an empty list. A timeout and an absence look identical from the outside, so a timeout alone can never
+      produce a negative here. The chain has to be asked directly, and it has to answer.
+    </p>
+  </div>
+</section>
+
+<section id="refuses">
+  <div class="wrap">
+    <div class="num">05 — WHAT IT REFUSES TO DO</div>
+    <h2>Evidence, never a verdict.</h2>
+    <ul class="plain">
+      <li><b>No score, no rank, no risk level.</b> A single number invites trust it has not earned. Every output is a list of dated, sourced facts.</li>
+      <li><b>Never "these wallets are the same person."</b> A shared funding source is disclosed as a fact with a timestamp, not as proof of common control.</li>
+      <li><b>Missing data stays missing.</b> If something could not be checked, it says so. It is never rounded down to "clean".</li>
+      <li><b>Every claim carries its receipt.</b> A transaction hash or block number accompanies each fact, or it does not ship.</li>
+      <li><b>No key, no signer, no buy button.</b> It reads. It cannot trade, even if you want it to.</li>
+    </ul>
+    <p>
+      The full seven rules live in <code>RULES.md</code>, in the repository, in plain text. Rule 4 is the one
+      most likely to be tempting to bend for a punchier post. It does not get bent.
+    </p>
+  </div>
+</section>
+
+<section id="onchain">
+  <div class="wrap">
+    <div class="num">06 — ON-CHAIN</div>
+    <h2>The contracts this reads, and nothing else.</h2>
+    <table>
+      <thead><tr><th>contract</th><th>address</th></tr></thead>
+      <tbody>
+        <tr><td>PonsV2LaunchFactory</td><td><code>0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e</code></td></tr>
+        <tr><td>PonsV2LaunchAndBuy</td><td><code>0xe33e9e479df8802cb0866d5d05258bec4cf62948</code></td></tr>
+        <tr><td>PonsV2MemeHook</td><td><code>0xe5e702641ea86f4ae6cc3cdaed2b886f976be044</code></td></tr>
+        <tr><td>locker</td><td><code>0x267444d099b10fb5ed7c3cc7b7c767adca574952</code></td></tr>
+        <tr><td>public RPC</td><td><code>rpc.mainnet.chain.robinhood.com</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      The live numbers at the top of this page are read from that RPC by your own browser, right now. No key,
+      no backend, nothing cached — the same endpoint the tool uses.
+    </p>
+  </div>
+</section>
+
+<section id="run">
+  <div class="wrap">
+    <div class="num">07 — RUN IT</div>
+    <h2>Node 18, no build step, no dependencies.</h2>
+    <pre><span class="c">$</span> git clone https://github.com/dunik77/thread <span class="c">&&</span> cd thread
+<span class="c">$</span> npm test                       <span class="c"># 55 checks, offline, no key needed</span>
+
+<span class="c"># deployer history needs a free Bitquery token</span>
+<span class="c">$</span> cp .env.example .env           <span class="c"># then paste your token in</span>
+<span class="c">$</span> npm run serve                  <span class="c">#</span> <span class="g">→ http://localhost:4663</span></pre>
+    <p>
+      The ERC-20 reader needs no key at all and opens straight from disk. The token is only required for
+      deployer history, and it lives in the server process — never in a page, because a key in a static page
+      is a key anyone can read out of view-source.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/dunik77/thread">GITHUB ↗</a>
+      <a class="btn" href="https://github.com/dunik77/thread/blob/main/RULES.md">RULES.MD ↗</a>
+      <a class="btn" href="https://github.com/dunik77/thread/blob/main/STATUS.md">WHAT IS NOT BUILT ↗</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <p>
+        <b style="color:var(--dim)">Research, not advice.</b> thread reads public chain data and shows it
+        back with its sources. It does not tell you whether to buy anything, and it has no opinion about
+        any token. Fee-recipient history is not implemented — see STATUS.md for everything else that is not.
+      </p>
+      <p style="text-align:right">
+        <a href="https://github.com/dunik77/thread">github.com/dunik77/thread</a><br>
+        MIT licensed
+      </p>
+    </div>
+    <p class="legal">
+      independent project · not affiliated with, endorsed by, or sponsored by Robinhood Markets, Inc. or Pons ·
+      read-only, holds no keys and places no trades · not financial advice · the Robinhood mark identifies the
+      chain this reads and belongs to its owner
+    </p>
+  </div>
+</footer>
+
+<script>
+/*
+ * The three live numbers are real reads against the public Robinhood Chain
+ * RPC, made by the visitor's own browser. No key, no backend, no cache --
+ * a landing page that claims to read the chain should be able to prove it
+ * while you are looking at it.
+ */
+const RPC = "https://rpc.mainnet.chain.robinhood.com";
+
+async function rpc(method, params = []) {
+  const res = await fetch(RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
+  return json.result;
+}
+
+function set(id, value) {
+  const el = document.getElementById(id);
+  el.textContent = value;
+  el.classList.remove("pending");
+}
+
+async function loadLive() {
+  try {
+    const heightHex = await rpc("eth_blockNumber");
+    const height = parseInt(heightHex, 16);
+    set("height", height.toLocaleString());
+
+    const gasHex = await rpc("eth_gasPrice");
+    const gwei = parseInt(gasHex, 16) / 1e9;
+    set("gas", gwei < 0.01 ? gwei.toFixed(5) + " gwei" : gwei.toFixed(3) + " gwei");
+
+    // block time, measured rather than quoted: two blocks 100 apart
+    const [a, b] = await Promise.all([
+      rpc("eth_getBlockByNumber", ["0x" + (height - 100).toString(16), false]),
+      rpc("eth_getBlockByNumber", [heightHex, false]),
+    ]);
+    const dt = (parseInt(b.timestamp, 16) - parseInt(a.timestamp, 16)) / 100;
+    set("blocktime", dt > 0 ? dt.toFixed(2) + " s" : "sub-second");
+  } catch (err) {
+    // a landing page that can't reach the chain should say so, not sit on
+    // three spinners pretending
+    for (const id of ["height", "gas", "blocktime"]) {
+      const el = document.getElementById(id);
+      if (el.classList.contains("pending")) el.textContent = "unreachable";
+    }
+  }
+}
+
+loadLive();
+</script>
+</body>
+</html>
