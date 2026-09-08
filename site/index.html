@@ -216,14 +216,20 @@
   .warnbox b{color:var(--amber);}
 
   .launches{max-height:420px;overflow-y:auto;}
-  .launch{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:11px 20px;border-bottom:1px solid var(--line-soft);font-size:13px;}
+  .launch{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;padding:11px 20px;border-bottom:1px solid var(--line-soft);font-size:13px;}
   .launch:last-child{border-bottom:none;}
   .launch .t{font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .launch .t b{color:var(--amber);font-weight:600;}
   .launch .t span{color:var(--faint);}
+  .token-address{font:inherit;color:var(--faint);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:color .18s,text-decoration-color .18s;}
+  .token-address:hover{color:var(--cyan);text-decoration-color:var(--cyan);}
+  .token-address:focus-visible{outline:1px solid var(--cyan);outline-offset:3px;border-radius:2px;}
   .launch .when{font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap;}
   .launch a{font-family:var(--mono);font-size:11px;color:var(--green);text-decoration:none;border:1px solid var(--line);border-radius:3px;padding:3px 8px;white-space:nowrap;}
   .launch a:hover{border-color:var(--green);}
+  .launch-copy{font-family:var(--mono);font-size:11px;color:var(--dim);background:transparent;border:1px solid var(--line);border-radius:3px;padding:3px 8px;cursor:pointer;white-space:nowrap;transition:border-color .18s,color .18s,background .18s;}
+  .launch-copy:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(96,246,210,.05);}
+  .launch-copy.copied{border-color:var(--green);color:var(--green);}
 
   .toast{
     position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);
@@ -253,7 +259,7 @@
     .lede{font-size:16px;max-width:100%}
     .hero-visual{min-height:280px}.signal-card{width:250px;border-radius:20px}.orbit{width:290px;height:290px}.signal-tag.one{left:-8px}.signal-tag.two{right:-8px}
     .live div{flex-basis:50%;border-bottom:1px solid var(--line)}.lookup button{min-height:48px;flex:1 1 100%}#try .wrap{margin-inline:10px;padding:28px 20px}
-    .res .kv{grid-template-columns:1fr;gap:4px}.launch{grid-template-columns:1fr auto}.launch .when{display:none}table{display:block;overflow-x:auto}footer .cols p:last-child{text-align:left!important}
+    .res .kv{grid-template-columns:1fr;gap:4px}.launch{grid-template-columns:minmax(0,1fr) auto auto}.launch .when{display:none}table{display:block;overflow-x:auto}footer .cols p:last-child{text-align:left!important}
   }
   @media (prefers-reduced-motion:reduce){.orbit,.signal-card::before,.eyebrow::before{animation:none}.btn,.grid .cell{transition:none}}
 </style>
@@ -723,7 +729,8 @@ async function readToken(address) {
     out.symbol = val(1) && decodeString(val(1));
     if (val(2)) {
       const dec = val(3) ? parseInt(val(3), 16) : 18;
-      out.supply = (BigInt(val(2)) / 10n ** BigInt(dec)).toString();
+      out.supplyRaw = BigInt(val(2));          // kept raw, so the curve math stays exact
+      out.supply = (out.supplyRaw / 10n ** BigInt(dec)).toString();
     }
   } catch {}
   return out;
@@ -763,13 +770,122 @@ async function nameLaunches(launches) {
 }
 
 function parseLog(log) {
+  // TokenLaunched(token indexed, curve indexed, deployer indexed, pairToken, launchConfigId, graduationThreshold)
+  const data = (log.data || "0x").slice(2);
   return {
     token: fromTopic(log.topics[1]),
+    curve: fromTopic(log.topics[2]),
     deployer: fromTopic(log.topics[3]),
+    pairToken: data.length >= 64 ? "0x" + data.slice(24, 64) : null,
+    gradThreshold: data.length >= 192 ? BigInt("0x" + data.slice(128, 192)) : null,
     txHash: log.transactionHash,
     blockHex: log.blockNumber,
     block: parseInt(log.blockNumber, 16),
   };
+}
+
+/**
+ * Value the token from its own bonding curve.
+ *
+ * The curve answers getReserves() — the Uniswap V2 selector, 0x0902f1ac —
+ * returning (quote reserve, token reserve). Price is one divided by the
+ * other, and fully diluted value is that price across the whole supply.
+ *
+ * Two things this must not get wrong:
+ *
+ * The quote asset is not always ETH. Pons launches trade against whatever
+ * the launch chose, and tokenised equities turn up there — the first curve
+ * checked while building this was quoted in MSTR. So the figure is reported
+ * in the quote asset's own symbol and never silently called dollars.
+ *
+ * A graduated launch has an empty curve: liquidity has moved to the Uniswap
+ * v4 pool and the reserves read 0/0. Dividing there would print a confident
+ * zero for a token that may be worth plenty, so that case is detected and
+ * labelled instead of computed.
+ */
+/**
+ * Turn a curve-denominated figure into dollars, but only where a dollar
+ * figure can actually be justified.
+ *
+ * Pons launches are quoted in three different kinds of thing, and they are
+ * not equally priceable from here:
+ *
+ *   USDG          a dollar stablecoin — the number already is dollars
+ *   native ETH    one public, keyless price lookup away
+ *   NVDA, MSTR,   tokenised equities. Pricing these means pricing the
+ *   PLTR, IBM,    underlying stock and assuming the wrapper tracks it. That
+ *   DJT, SPCX     assumption is not checked here, so no dollar figure is
+ *                 invented for them -- the launch is shown in its own quote
+ *                 asset instead.
+ *
+ * Returning null is a real answer. It means "not priceable from what this
+ * page can see", which is different from zero and different from unknown.
+ */
+const USD_STABLES = new Set(["USDG", "USDC", "USDT", "DAI"]);
+let ethUsdCache = null;
+
+async function ethUsd() {
+  if (ethUsdCache !== null) return ethUsdCache;
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
+    const json = await res.json();
+    ethUsdCache = json?.ethereum?.usd ?? null;
+  } catch {
+    ethUsdCache = null;
+  }
+  return ethUsdCache;
+}
+
+async function toUsd(amount, symbol, isNative) {
+  if (USD_STABLES.has((symbol || "").toUpperCase())) {
+    return { value: amount, source: "quoted in " + symbol + ", a dollar stablecoin" };
+  }
+  if (isNative) {
+    const px = await ethUsd();
+    if (px) return { value: amount * px, source: `ETH at $${px.toLocaleString()}, CoinGecko` };
+  }
+  return null;
+}
+
+async function readCurveValue(launch, supplyRaw) {
+  if (!launch || !launch.curve || supplyRaw == null) return null;
+  try {
+    const raw = await rpc("eth_call", [{ to: launch.curve, data: "0x0902f1ac" }, "latest"]);
+    if (!raw || raw === "0x" || raw.length < 130) return null;
+
+    const quoteRaw = BigInt("0x" + raw.slice(2, 66));
+    const tokenRaw = BigInt("0x" + raw.slice(66, 130));
+
+    if (tokenRaw === 0n) return { graduated: true };
+
+    // quote asset: 0x0 means the chain's native coin
+    const isNative = !launch.pairToken || /^0x0+$/.test(launch.pairToken);
+    let symbol = "ETH", decimals = 18;
+    if (!isNative) {
+      const [s, d] = await Promise.allSettled([
+        rpc("eth_call", [{ to: launch.pairToken, data: "0x95d89b41" }, "latest"]),
+        rpc("eth_call", [{ to: launch.pairToken, data: "0x313ce567" }, "latest"]),
+      ]);
+      if (s.status === "fulfilled") symbol = decodeString(s.value) || "?";
+      if (d.status === "fulfilled" && d.value) decimals = parseInt(d.value, 16);
+    }
+
+    // fdv = supply * (quote / token), with the token units cancelling
+    const fdvRaw = (supplyRaw * quoteRaw) / tokenRaw;
+    const fdv = Number(fdvRaw) / 10 ** decimals;
+
+    const raised = Number(quoteRaw) / 10 ** decimals;
+    const target = launch.gradThreshold ? Number(launch.gradThreshold) / 10 ** decimals : null;
+
+    const [usd, raisedUsd] = await Promise.all([
+      toUsd(fdv, symbol, isNative),
+      toUsd(raised, symbol, isNative),
+    ]);
+    return { fdv, symbol, decimals, usd, raised, raisedUsd, target,
+             progress: target ? raised / target : null };
+  } catch {
+    return null;
+  }
 }
 
 function copyBtn(value) {
@@ -803,23 +919,63 @@ function render(input, meta, result) {
   if (meta.isContract && meta.supply) {
     html += `<div class="kv"><div class="k">total supply</div><div class="v">${Number(meta.supply).toLocaleString()} ${esc(meta.symbol || "")}</div></div>`;
   }
-  html += `<div class="kv"><div class="k">deployer</div><div class="v">
-      <a href="${EXPLORER}/address/${result.deployer}" target="_blank" rel="noopener">${result.deployer}</a>${copyBtn(result.deployer)}
-    </div></div>`;
 
-  if (infra) {
-    html += `<div class="warnbox"><b>⚠ ${esc(infra.name)} — not a person.</b> ${esc(infra.why)}</div>`;
+  const v = result.value;
+  if (v && v.graduated) {
+    html += `<div class="kv"><div class="k">market cap</div><div class="v" style="font-family:var(--sans);color:var(--dim)">
+      Graduated — the bonding curve is empty and liquidity has moved to the Uniswap v4 pool.
+      This page prices launches from the curve, so it will not quote a figure it cannot read.
+    </div></div>`;
+  } else if (v) {
+    const money = (u) => "$" + Math.round(u).toLocaleString();
+    const q = (n) => n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+
+    html += `<div class="kv"><div class="k">market cap</div><div class="v">`;
+    if (v.usd) {
+      html += `<span style="color:var(--green);font-size:17px">${money(v.usd.value)}</span>
+               <span style="color:var(--faint)"> &nbsp;·&nbsp; ${q(v.fdv)} ${esc(v.symbol)}</span>`;
+    } else {
+      html += `<span style="font-size:17px">${q(v.fdv)} <span style="color:var(--amber)">${esc(v.symbol)}</span></span>`;
+    }
+    html += `<div style="font-family:var(--sans);color:var(--faint);font-size:12px;margin-top:6px">`;
+    if (v.fdv === 0) {
+      html += `Spot value of the curve's actual reserves, and nothing has been bought yet — so this reads
+               zero. It is not the curve's asking price: Pons prices launches with virtual reserves that
+               <code>getReserves()</code> does not expose, and that formula is not decoded here. Treat this
+               as "nothing raised", not "worthless".`;
+    } else if (v.usd) {
+      html += `Fully diluted, from the curve's live reserves · ${esc(v.usd.source)}`;
+    } else {
+      html += `Fully diluted, from the curve's live reserves. No dollar figure: this launch is quoted in a
+               tokenised equity, and pricing that means pricing the underlying stock and assuming the wrapper
+               tracks it — an assumption this page will not make silently.`;
+    }
+    html += `</div></div></div>`;
+
+    if (v.target) {
+      const pct = (v.progress * 100).toFixed(1);
+      html += `<div class="kv"><div class="k">raised on curve</div><div class="v">
+        ${q(v.raised)} <span style="color:var(--faint)">of ${q(v.target)} ${esc(v.symbol)} to graduate</span>
+        <span style="color:var(--green)"> &nbsp;${pct}%</span>
+        ${v.raisedUsd ? `<span style="color:var(--faint)"> &nbsp;·&nbsp; ${money(v.raisedUsd.value)}</span>` : ""}
+        <div style="font-family:var(--sans);color:var(--faint);font-size:12px;margin-top:6px">
+          Both figures read straight off the curve contract and the launch event — no model, no estimate.
+        </div>
+      </div></div>`;
+    }
   }
 
-  if (result.launches.length) {
+  if (result.launches && result.launches.length) {
     html += `<div class="launches">`;
     for (const l of result.launches) {
+      const addressButton = `<button class="token-address" data-copy="${esc(l.token)}" title="Copy full token contract" aria-label="Copy token contract ${esc(l.token)}">${short(l.token)}</button>`;
       const label = l.symbol
-        ? `<b>$${esc(l.symbol)}</b> <span>${short(l.token)}</span>`
-        : `<span>${short(l.token)}</span>`;
+        ? `<b>$${esc(l.symbol)}</b> ${addressButton}`
+        : addressButton;
       html += `<div class="launch">
         <span class="t">${label}</span>
         <span class="when">${l.when || "block " + l.block.toLocaleString()}</span>
+        <button class="launch-copy" data-copy="${esc(l.token)}" title="Copy token contract" aria-label="Copy token contract ${esc(l.token)}">copy CA</button>
         <a href="${EXPLORER}/tx/${l.txHash}" target="_blank" rel="noopener">tx ↗</a>
       </div>`;
     }
@@ -883,10 +1039,13 @@ async function trace() {
     const launches = logs.map(parseLog).sort((a, b) => b.block - a.block);
     const meta = await readToken(input);
 
+    // price the token off its own curve, but only when the input IS the token
+    const value = viaToken ? await readCurveValue(parseLog(asToken[0]), meta.supplyRaw) : null;
+
     status.textContent = `naming ${Math.min(launches.length, 40)} launch${launches.length === 1 ? "" : "es"}…`;
     await Promise.all([nameLaunches(launches), attachTimes(launches)]);
 
-    render(input, meta, { status: "resolved", deployer, viaToken, launches, scanned });
+    render(input, meta, { status: "resolved", deployer, viaToken, launches, scanned, value });
     const days = (scanned * 0.11) / 86400;
     status.textContent =
       `done — ${launches.length} launch${launches.length === 1 ? "" : "es"} in the last ` +
@@ -903,15 +1062,43 @@ $("chips").innerHTML = EXAMPLES.map((e) =>
   `<button data-a="${e.a}">${short(e.a)} · ${esc(e.tag)}</button>`
 ).join("");
 
-document.addEventListener("click", (ev) => {
+async function copyText(value) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const field = document.createElement("textarea");
+  field.value = value;
+  field.setAttribute("readonly", "");
+  field.style.cssText = "position:fixed;left:-9999px;opacity:0";
+  document.body.appendChild(field);
+  field.select();
+  const copied = document.execCommand("copy");
+  field.remove();
+  if (!copied) throw new Error("copy unavailable");
+}
+
+document.addEventListener("click", async (ev) => {
   const chip = ev.target.closest("#chips button");
   if (chip) { $("addr").value = chip.dataset.a; trace(); return; }
 
   const copy = ev.target.closest("button[data-copy]");
   if (copy) {
-    navigator.clipboard?.writeText(copy.dataset.copy);
     const t = $("toast");
-    t.textContent = "Copied " + short(copy.dataset.copy);
+    try {
+      await copyText(copy.dataset.copy);
+      t.textContent = "Copied " + short(copy.dataset.copy);
+      copy.classList.add("copied");
+      const original = copy.textContent;
+      copy.textContent = "copied";
+      setTimeout(() => {
+        copy.classList.remove("copied");
+        copy.textContent = original;
+      }, 1200);
+    } catch {
+      t.textContent = "Copy failed — select the address manually";
+    }
     t.classList.add("show");
     clearTimeout(window.__t);
     window.__t = setTimeout(() => t.classList.remove("show"), 1600);
